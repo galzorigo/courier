@@ -446,3 +446,40 @@ test("dropdowns are Courier's own menu: check on the current value, keyboard wor
   await expect(menu).toHaveCount(0)
   await expect(o(page, '.panel')).toBeVisible()
 })
+
+test('a link whose row lives on an inner span: the note says so, Enter steps in, column works', async ({ page }) => {
+  await start(page)
+  // Like the portfolio's project rows: an absolute arrow plus one inner flex row.
+  await page.evaluate(() => {
+    const a = document.createElement('a')
+    a.className = 'project-row'
+    a.href = '#'
+    a.style.cssText = 'position:relative;display:flex;align-items:center;width:320px'
+    a.innerHTML =
+      '<svg style="position:absolute;left:0;top:0" width="16" height="16"><circle cx="8" cy="8" r="6"/></svg>' +
+      '<span class="project-line" style="display:flex"><span class="name">Erxes 3.0</span><span class="desc" style="margin-left:6px">Redesigning a platform</span></span>'
+    document.querySelector('.hero')!.append(a)
+  })
+  await page.locator('.project-row .name').click({ force: true })
+  await expect(o(page, '.panel-title h2')).toHaveText('a.project-row')
+  await expect(o(page, '[data-row="flex-direction"] .pnote')).toContainText('One item inside, so direction changes nothing you can see')
+  await expect(o(page, '[data-row="flex-direction"] .pnote')).toContainText('select the span.project-line')
+
+  await page.keyboard.press('Enter')
+  await expect(o(page, '.panel-title h2')).toHaveText('span.project-line')
+  await expect(o(page, '[data-row="flex-direction"] .pnote')).toHaveCount(0)
+  await field(page, 'flex-direction').locator('[data-value="column"]').click()
+  // Name now sits above the description.
+  const stacked = await page.locator('.project-row').evaluate((a) => {
+    const n = a.querySelector('.name')!.getBoundingClientRect()
+    const d = a.querySelector('.desc')!.getBoundingClientRect()
+    return d.top >= n.bottom - 1
+  })
+  expect(stacked).toBe(true)
+
+  // The header button does the same, and Shift+Enter goes back up.
+  await page.keyboard.press('Shift+Enter')
+  await expect(o(page, '.panel-title h2')).toHaveText('a.project-row')
+  await o(page, '[data-select-child]').click()
+  await expect(o(page, '.panel-title h2')).toHaveText('span.project-line')
+})

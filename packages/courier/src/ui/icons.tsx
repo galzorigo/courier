@@ -111,6 +111,7 @@ const GLYPHS: Record<string, JSX.Element | JSX.Element[]> = {
   swap: <path d="M2.5 5.5h10l-2.5-2.5M13.5 10.5h-10l2.5 2.5" />,
   plus: <path d="M8 3.5v9M3.5 8h9" />,
   parent: [<path key="a" d="M8 12.5v-9M4.5 7 8 3.5 11.5 7" />],
+  child: [<path key="a" d="M8 3.5v9M4.5 9 8 12.5 11.5 9" />],
   minus: <path d="M3.5 8h9" />,
   'arrow-right': <path d="M2.5 8h11M10 4.5 13.5 8 10 11.5" />,
   'arrow-down': <path d="M8 2.5v11M4.5 10 8 13.5 11.5 10" />,

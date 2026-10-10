@@ -76,6 +76,7 @@ These elements share one style. Change the shared rule or component so all 6 upd
 | Arrow up and down | Nudge a number (Shift for 10, Alt for 0.1) |
 | Drag a field's label | Scrub the value |
 | Shift Enter | Select the parent |
+| Enter | Select the child |
 | Cmd Z, Cmd Shift Z | Undo, redo |
 | Escape | Close a menu, then the panel, then Courier |
 

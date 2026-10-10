@@ -6,7 +6,7 @@ import { EditorContext, createEditor } from './editor'
 import { Highlights, useFrame } from './highlights'
 import { Check, Close, Copy, Eye, EyeOff, PencilFill, Trash } from './icons'
 import { useInspect } from './inspect'
-import { Inspector, selectableParent } from './inspector'
+import { Inspector, selectableChild, selectableParent } from './inspector'
 
 /** Outcome of restoring changes after a reload, filled in by mount(). */
 export interface RestoreReport {
@@ -181,6 +181,12 @@ export function App({ store, host, resolveSource, report }: AppProps) {
     if (p) setSelected(p)
   }
 
+  // Down into the element: how a link's inner row is reached, since clicks pick the link.
+  const selectChild = () => {
+    const c = latest.current.selected && selectableChild(latest.current.selected)
+    if (c) setSelected(c)
+  }
+
   const cancel = () => {
     if (store.dirty) store.revertUnsaved()
     else setSelected(null)
@@ -221,10 +227,17 @@ export function App({ store, host, resolveSource, report }: AppProps) {
         e.preventDefault()
         leaveField()
         store.redo()
-      } else if (e.key === 'Enter' && e.shiftKey && selected && !/^(INPUT|TEXTAREA|SELECT)$/.test((e.composedPath()[0] as Element).tagName)) {
-        // Shift+Enter selects the parent, as in Figma. Never while typing in a field.
+      } else if (
+        e.key === 'Enter' &&
+        selected &&
+        !/^(INPUT|TEXTAREA|SELECT)$/.test((e.composedPath()[0] as Element).tagName) &&
+        (e.shiftKey || (e.composedPath()[0] as Element).tagName !== 'BUTTON')
+      ) {
+        // Shift+Enter selects the parent, Enter a child, as in Figma. Never while
+        // typing in a field. Plain Enter on a focused button still presses it.
         e.preventDefault()
-        selectParent()
+        if (e.shiftKey) selectParent()
+        else selectChild()
       } else if (e.key === 'Escape') {
         // One layer per press: an open overlay first, then the panel, then Courier.
         e.stopPropagation()
@@ -384,6 +397,7 @@ export function App({ store, host, resolveSource, report }: AppProps) {
               onTab={setTab}
               onClose={() => setSelected(null)}
               onParent={selectParent}
+              onChild={selectChild}
               panelProps={{
                 onPointerDown: startDrag,
                 // Offsets, not a transform: a transform would become the
@@ -454,6 +468,9 @@ export function App({ store, host, resolveSource, report }: AppProps) {
                 aria-label={open ? 'Close' : 'Open Courier'}
                 data-tip={open ? 'Close' : 'Edit styles'}
                 onClick={(e) => {
+                  // Clicked, not keyed: let go of focus, or Enter (select child) would
+                  // press this button again and close Courier.
+                  if (e.detail !== 0) e.currentTarget.blur()
                   if (open) return close(e.detail === 0)
                   setInstant(e.detail === 0)
                   setOpen(true)

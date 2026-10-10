@@ -776,3 +776,38 @@ test('tooltips go away when the pointer leaves', async ({ page }) => {
   await page.mouse.move(1279, 859, { steps: 4 })
   await expect(o(page, '.tooltip')).toHaveCount(0)
 })
+
+test('a down arrow shows while there is more below, and goes once scrolled to the bottom', async ({ page }) => {
+  await open(page)
+  await select(page, 'LinkedIn')
+  const more = o(page, '[data-scroll-more]')
+  const body = o(page, '.panel-body')
+  // Layout is longer than the panel.
+  await expect(more).toHaveClass(/show/)
+  const shadow = await more.evaluate((el) => getComputedStyle(el).boxShadow)
+  expect(shadow).toContain('rgba(0, 0, 0, 0.65)')
+  const box = (await more.boundingBox())!
+  expect([box.width, box.height]).toEqual([28, 28])
+  expect(await more.evaluate((el) => getComputedStyle(el).borderRadius)).toBe('50%')
+  // The content fades out under it.
+  await expect(page.locator('courier-overlay .body-wrap')).toHaveClass(/fade-bottom/)
+  // Each click moves down; at the bottom it disappears.
+  const atBottom = () => body.evaluate((el) => Math.ceil(el.scrollTop + el.clientHeight) >= el.scrollHeight - 2)
+  for (let i = 0; i < 6 && !(await atBottom()); i++) {
+    const before = await body.evaluate((el) => el.scrollTop)
+    await more.click()
+    await expect.poll(() => body.evaluate((el) => el.scrollTop)).toBeGreaterThan(before)
+    // Let the smooth scroll settle before deciding whether to click again.
+    await page.waitForTimeout(400)
+  }
+  await expect(more).not.toHaveClass(/show/)
+  await expect(page.locator('courier-overlay .body-wrap')).not.toHaveClass(/fade-bottom/)
+  expect(await body.evaluate((el) => Math.ceil(el.scrollTop + el.clientHeight) >= el.scrollHeight - 2)).toBe(true)
+  // Scrolling back up brings it back; a tab that fits shows none.
+  await body.evaluate((el) => (el.scrollTop = 0))
+  await expect(more).toHaveClass(/show/)
+  await tab(page, 'Text')
+  await page.locator('.section h2').first().click({ force: true })
+  await tab(page, 'Appearance')
+  await expect(more).not.toHaveClass(/show/)
+})

@@ -9,6 +9,7 @@ import {
   gapApplies,
   gapProperties,
   innerLayout,
+  layoutItems,
   isFlex,
   isGrid,
   fontWeights,
@@ -77,6 +78,23 @@ export function selectableParent(el: Element): Element | null {
   return p && p !== document.body && p !== document.documentElement ? p : null
 }
 
+/**
+ * The child worth selecting: the wrapper that lays out the content when there
+ * is one (a link's inner row), otherwise the first child in the layout flow.
+ * Clicks inside a link pick the link, so this is how its inside is reached.
+ */
+export function selectableChild(el: Element): Element | null {
+  const inner = innerLayout(el)
+  if (inner) return inner
+  return (
+    [...el.children].find((c) => {
+      if (c.closest('svg') !== c && c instanceof SVGElement) return false
+      const cs = getComputedStyle(c)
+      return cs.display !== 'none' && cs.position !== 'absolute' && cs.position !== 'fixed'
+    }) ?? null
+  )
+}
+
 /** Tabs group categories into a few panels. Counts add up. */
 interface TabDef {
   id: string
@@ -97,6 +115,7 @@ export function Inspector({
   onTab,
   onClose,
   onParent,
+  onChild,
   panelProps,
 }: {
   footer: ComponentChildren
@@ -106,6 +125,8 @@ export function Inspector({
   onClose(): void
   /** Select the element's parent (cards can fill a grid so it can't be clicked). */
   onParent(): void
+  /** Select the element inside that lays out its content. */
+  onChild(): void
   /** Drag handling and position, owned by the app. */
   panelProps?: JSX.HTMLAttributes<HTMLElement>
 }) {
@@ -143,6 +164,7 @@ export function Inspector({
   const active = shown.find((t) => t.id === tab) ?? shown[0]
   const d = describe(ed.el)
   const parent = selectableParent(ed.el)
+  const child = selectableChild(ed.el)
 
   const body = useRef<HTMLDivElement>(null)
 
@@ -154,6 +176,25 @@ export function Inspector({
   useLayoutEffect(() => {
     if (body.current) body.current.scrollTop = 0
   }, [active.id])
+
+  // A down arrow while there's more below; gone once scrolled to the bottom or
+  // everything fits. Checked after every render (tab switches, added sections),
+  // on scroll, and when the panel resizes.
+  const [more, setMore] = useState(false)
+  const measure = () => {
+    const el = body.current
+    if (!el) return
+    const next = el.scrollTop + el.clientHeight < el.scrollHeight - 2
+    setMore((prev) => (prev === next ? prev : next))
+  }
+  useLayoutEffect(measure)
+  useEffect(() => {
+    const el = body.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   return (
     <section class="panel" aria-label="Styles used on this element" {...panelProps}>
@@ -172,6 +213,17 @@ export function Inspector({
             <Glyph name="parent" />
           </button>
         )}
+        {child && (
+          <button
+            class="icon-btn flat"
+            data-select-child
+            data-tip={`Select child ${shortName(child)}, Enter`}
+            aria-label="Select child"
+            onClick={onChild}
+          >
+            <Glyph name="child" />
+          </button>
+        )}
         <button class="icon-btn flat" data-tip="Undo" aria-label="Undo" disabled={!ed.store.canUndo} onClick={() => ed.store.undo()}>
           <Undo />
         </button>
@@ -183,7 +235,8 @@ export function Inspector({
         </button>
       </header>
       <Tabs shown={shown} active={active.id} counts={counts} onTab={switchTab} />
-      <div class="panel-body" role="tabpanel" data-section={active.id} ref={body}>
+      <div class={`body-wrap${more ? ' fade-bottom' : ''}`}>
+      <div class="panel-body" role="tabpanel" data-section={active.id} ref={body} onScroll={measure}>
         {active.id === 'Layout' ? (
           // One flow: size sits under direction, spacing under gap.
           <>
@@ -207,6 +260,17 @@ export function Inspector({
             />
           </>
         )}
+      </div>
+      <button
+        class={`scroll-more${more ? ' show' : ''}`}
+        data-scroll-more
+        aria-label="Scroll down"
+        tabIndex={more ? 0 : -1}
+        aria-hidden={!more}
+        onClick={() => body.current?.scrollBy({ top: body.current.clientHeight * 0.8, behavior: 'smooth' })}
+      >
+        <Glyph name="arrow-down" />
+      </button>
       </div>
       {footer}
     </section>
@@ -236,7 +300,18 @@ function LayoutBody({ size, spacing: showSpacing }: { size: boolean; spacing: bo
         <SelectField property="display" options={optionsOf('display')} />
       </Row>
       {flex && (
-        <Row label="Direction" props={['flex-direction']}>
+        <Row
+          label="Direction"
+          props={['flex-direction']}
+          note={
+            // With one item there's nothing to stack: say so instead of silently doing nothing.
+            layoutItems(ed.el) < 2
+              ? `One item inside, so direction changes nothing you can see.${
+                  selectableChild(ed.el) ? ` Press Enter to select the ${shortName(selectableChild(ed.el)!)} that holds the content.` : ''
+                }`
+              : undefined
+          }
+        >
           <SegField
             property="flex-direction"
             value={column ? 'column' : 'row'}

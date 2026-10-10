@@ -204,6 +204,45 @@ button:disabled { cursor: default; opacity: 0.4; }
   overscroll-behavior: contain;
   border-bottom: 1px solid var(--line);
 }
+/* Holds the scroll area and the "more below" arrow, which floats over its bottom edge. */
+.body-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.scroll-more {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  width: var(--h);
+  height: var(--h);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #3a3a3a;
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65), 0 3px 8px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  opacity: 0;
+  transform: translate(-50%, 4px);
+  pointer-events: none;
+  transition: opacity 150ms ease, transform 150ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+/* While there's more below, the content fades out under the arrow. A layer on
+   top, not a mask, so menus opened inside the body aren't clipped by it. */
+.body-wrap::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 8px;
+  bottom: 0;
+  height: 64px;
+  z-index: 1;
+  background: linear-gradient(to bottom, transparent, var(--body));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.body-wrap.fade-bottom::after { opacity: 1; }
+.scroll-more { z-index: 2; }
+.scroll-more.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.scroll-more:hover { background: #454545; }
+@media (prefers-reduced-motion: reduce) { .scroll-more { transform: translate(-50%, 0); } }
 .panel-foot { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
 .row { display: flex; align-items: center; gap: 8px; }
 .spread { justify-content: space-between; }
