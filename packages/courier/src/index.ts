@@ -3,6 +3,7 @@ import { ChangeStore, readStored, restoreInto, snapshot, writeStored, type Sourc
 import { App, type RestoreReport } from './ui/App'
 import { registerFont } from './ui/font'
 import { css } from './ui/styles'
+import { watchTone } from './ui/tone'
 
 export type { SourceLocation, SourceResolver } from './core'
 
@@ -34,6 +35,7 @@ export function mount(options: CourierOptions = {}): () => void {
   const root = document.createElement('div')
   root.className = 'root'
   shadow.append(style, root)
+  const unwatchTone = watchTone(root)
   // Keys typed in our inputs stay out of the page's shortcut handlers.
   for (const type of ['keydown', 'keyup', 'keypress']) host.addEventListener(type, (e) => e.stopPropagation())
   document.documentElement.appendChild(host)
@@ -77,6 +79,7 @@ export function mount(options: CourierOptions = {}): () => void {
     observer?.disconnect()
     clearTimeout(timer)
     unsubscribe()
+    unwatchTone()
     store.clear()
     render(null, root)
     host.remove()

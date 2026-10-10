@@ -15,6 +15,12 @@ export const css = /* css */ `
   --chip-hover: #3c3c3c;
   --field: #303030;
   --line: rgba(255, 255, 255, 0.07);
+  /* Dark mode depth. On a dark page a shadow has nothing darker to sit on and
+     smears into a halo, so a light hairline draws the edge. Shadows stay tight
+     and do their work on light pages, where the hairline disappears. */
+  --ring: 0 0 0 1px rgba(255, 255, 255, 0.1);
+  --lift: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.24);
+  --pill-shadow: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3)) drop-shadow(0 6px 16px rgba(0, 0, 0, 0.22));
   --text: #ffffff;
   --muted: #8c8c8c;
   --blue: #2b6ef6;
@@ -32,6 +38,12 @@ export const css = /* css */ `
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+/* On a dark page the ambient shadow bands into a flat disc, so only the
+   hairline and a tight contact shadow remain. */
+.root.on-dark {
+  --lift: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --pill-shadow: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
 }
 
 button, input, select, textarea { font: inherit; letter-spacing: inherit; color: inherit; }
@@ -85,19 +97,21 @@ button:disabled { cursor: default; opacity: 0.4; }
   .dock.left { left: 16px; }
 }
 
-.panel { pointer-events: auto; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12); }
+.panel { pointer-events: auto; box-shadow: var(--ring), var(--lift); }
 
 /*
  * Toolbar: 40px circles in a pill with 4px padding (48px tall). The launcher
  * is the last button, so collapsed the pill is just clipped to its last 48px;
  * opening unclips leftwards to reveal the eye and copy buttons while the
  * pencil turns into the close button in place. Shadow lives on the wrapper
- * as drop-shadow, since clip-path would cut a box-shadow off.
+ * as drop-shadow, since clip-path would cut a box-shadow off. The first
+ * drop-shadow, a white one with almost no blur, is the hairline: it follows
+ * the clipped shape, so the edge is right collapsed, open and in between.
  */
 .toolbar-wrap {
   position: relative;
   pointer-events: none;
-  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.22)) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.14));
+  filter: drop-shadow(0 0 0.5px rgba(255, 255, 255, 0.3)) var(--pill-shadow);
 }
 .toolbar {
   pointer-events: auto;
@@ -217,7 +231,7 @@ button:disabled { cursor: default; opacity: 0.4; }
   border-radius: 50%;
   background: #3a3a3a;
   color: #fff;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65), 0 3px 8px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65), 0 3px 8px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
   opacity: 0;
   transform: translate(-50%, 4px);
   pointer-events: none;
@@ -492,7 +506,7 @@ select option { color: #111; }
   /* Concentric: 6px items + 4px padding. */
   border-radius: 10px;
   background: #2b2b2b;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), var(--lift);
 }
 .choices button {
   width: 100%;
@@ -656,7 +670,7 @@ select option { color: #111; }
   color: #fff;
   white-space: nowrap;
   pointer-events: none;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16), 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16), 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 .popover {
   position: fixed;
@@ -666,7 +680,7 @@ select option { color: #111; }
   border-radius: 18px;
   background: #2a2a2a;
   pointer-events: auto;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), var(--lift);
 }
 
 @media (prefers-reduced-motion: reduce) {

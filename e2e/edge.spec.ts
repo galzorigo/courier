@@ -483,3 +483,15 @@ test('a link whose row lives on an inner span: the note says so, Enter steps in,
   await o(page, '[data-select-child]').click()
   await expect(o(page, '.panel-title h2')).toHaveText('span.project-line')
 })
+
+test('on a dark page the ambient shadow gives way to the hairline', async ({ page }) => {
+  await page.goto('/')
+  const root = page.locator('courier-overlay .root')
+  await expect(root).not.toHaveClass(/on-dark/)
+  await page.evaluate(() => (document.body.style.background = '#161616'))
+  await expect(root).toHaveClass(/on-dark/)
+  const filter = await page.locator('courier-overlay .toolbar-wrap').evaluate((el) => getComputedStyle(el).filter)
+  expect(filter).not.toContain('16px')
+  await page.evaluate(() => (document.body.style.background = '#fafafa'))
+  await expect(root).not.toHaveClass(/on-dark/)
+})
