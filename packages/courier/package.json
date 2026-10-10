@@ -1,0 +1,71 @@
+{
+  "name": "@galzorigo/courier",
+  "version": "0.1.0",
+  "description": "Edit styles on your running site like in Figma, then copy exact before and after values for your coding agent. Dev only, no AI inside.",
+  "license": "MIT",
+  "author": "Gal Zorigo",
+  "keywords": [
+    "css",
+    "styles",
+    "design",
+    "visual-editor",
+    "devtools",
+    "inspector",
+    "figma",
+    "tailwind",
+    "ai",
+    "coding-agent",
+    "claude",
+    "cursor"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js",
+      "require": "./dist/core.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_LICENSES.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "watch": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "happy-dom": "^20.14.6",
+    "preact": "^10.27.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/galzorigo/courier.git",
+    "directory": "packages/courier"
+  },
+  "homepage": "https://github.com/galzorigo/courier#readme",
+  "bugs": {
+    "url": "https://github.com/galzorigo/courier/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

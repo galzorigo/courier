@@ -1,0 +1,21 @@
+{
+  "name": "courier-monorepo",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "playground"
+  ],
+  "scripts": {
+    "dev": "npm run build -w @galzorigo/courier && (npm run watch -w @galzorigo/courier & npm run dev -w playground)",
+    "build": "npm run build -w @galzorigo/courier && npm run build -w playground",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm test -w @galzorigo/courier",
+    "e2e": "playwright test",
+    "e2e:real": "playwright test --config=playwright.real.config.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "typescript": "^5.9.3"
+  }
+}
