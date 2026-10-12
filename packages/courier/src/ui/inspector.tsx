@@ -129,7 +129,7 @@ export function Inspector({
   /** Select the element inside that lays out its content. */
   onChild(): void
   /** Drag handling and position, owned by the app. */
-  panelProps?: JSX.HTMLAttributes<HTMLElement>
+  panelProps?: JSX.HTMLAttributes<HTMLElement> & { 'data-enter'?: boolean }
 }) {
   const ed = useEditor()
   const byCategory = ed.store.countByCategory(ed.el)
@@ -317,8 +317,9 @@ function LayoutBody({ size, spacing: showSpacing }: { size: boolean; spacing: bo
             property="flex-direction"
             value={column ? 'column' : 'row'}
             options={[
-              { value: 'row', label: 'Row', icon: 'arrow-right' },
+              // Column first, like Figma's auto layout.
               { value: 'column', label: 'Column', icon: 'arrow-down' },
+              { value: 'row', label: 'Row', icon: 'arrow-right' },
             ]}
             onValue={(v) => ed.set('flex-direction', 'self', reversed ? `${v}-reverse` : v)}
           />

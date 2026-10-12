@@ -24,6 +24,8 @@ async function open(page: Page) {
 async function select(page: Page, label: string) {
   await chip(page, label).click({ force: true })
   await expect(o(page, '.panel')).toBeVisible()
+  // Let the entrance settle, so measurements see the panel at full size.
+  await expect.poll(() => o(page, '.panel').evaluate((el) => getComputedStyle(el).transform)).toBe('none')
 }
 
 const saveBtn = (page: Page) => o(page, '.btn-primary')
@@ -84,6 +86,8 @@ test('layout shows only controls that apply and edits live', async ({ page }) =>
   await select(page, 'X')
   await expect(field(page, 'display').locator('.select-btn')).toHaveAttribute('data-value', 'flex')
   await expect(field(page, 'flex-direction').locator('[data-value="row"]')).toHaveClass(/on/)
+  // Column first, like Figma.
+  expect(await field(page, 'flex-direction').locator('button[data-value]').evaluateAll((b) => b.map((x) => x.getAttribute('data-value')))).toEqual(['column', 'row'])
   await expect(field(page, 'align-items').locator('[data-value="center"]')).toHaveClass(/on/)
   await expect(o(page, '[data-row~="gap"]')).toContainText('Between is set on the parent, affects all 4')
 
@@ -117,7 +121,7 @@ test('width and height have Fixed, Hug and Fill', async ({ page }) => {
   const width = () => page.locator('.section h2').first().evaluate((el) => el.getBoundingClientRect().width)
   const before = await width()
   await choose(h2mode, 'hug')
-  expect(await width()).toBeLessThan(before)
+  await expect.poll(width).toBeLessThan(before)
 })
 
 test('typing fast into a field keeps what was typed', async ({ page }) => {
@@ -396,6 +400,7 @@ test('color picker opens as an overlay and closes on outside click or Escape', a
   const pop = o(page, '[data-popover]')
   await expect(pop).toBeVisible()
   expect(await pop.evaluate((el) => getComputedStyle(el).position)).toBe('fixed')
+  await expect.poll(() => pop.evaluate((el) => getComputedStyle(el).transform)).toBe('none')
   // Hugging the field: right under it, or right above when there's no room below.
   const f = (await field(page, 'background-color').boundingBox())!
   const b = (await pop.boundingBox())!
@@ -759,6 +764,10 @@ test('the trash button deletes every change, and undo brings them back', async (
   await expect(o(page, '[data-marker]')).toHaveCount(0)
   await expect(o(page, '[data-saved]')).toHaveCount(0)
   await expect(o(page, '.toast')).toHaveText('Deleted 1 change')
+  // Over the trash button it came from.
+  const toastBox = (await o(page, '.toast').boundingBox())!
+  const trashBox = (await o(page, '[data-tool="trash"]').boundingBox())!
+  expect(Math.abs(toastBox.x + toastBox.width / 2 - (trashBox.x + trashBox.width / 2))).toBeLessThanOrEqual(1)
 
   await page.keyboard.press('ControlOrMeta+z')
   await expect.poll(() => css(page, '.link-chip', 'border-top-left-radius')).toBe('16px')

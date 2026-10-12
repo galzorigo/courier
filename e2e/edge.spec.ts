@@ -507,7 +507,9 @@ test('the saved message shows above the bar, and moves beside it when a panel op
   const bar = (await o(page, '.toolbar').boundingBox())!
   const above = (await toast.boundingBox())!
   expect(above.y + above.height).toBeLessThanOrEqual(bar.y)
-  expect(Math.round(above.x + above.width)).toBe(Math.round(bar.x + bar.width))
+  // Centered over the copy button, where the saved count lives.
+  const copyBox = (await o(page, '[data-tool="copy"]').boundingBox())!
+  expect(Math.abs(above.x + above.width / 2 - (copyBox.x + copyBox.width / 2))).toBeLessThanOrEqual(1)
 
   // Picking an element while it still shows: above the bar is now the panel's footer.
   await chip(page, 'X').click({ force: true })
@@ -531,7 +533,44 @@ test('a tooltip waits for the message its press caused, then comes back current'
   await copy.click()
   await expect(o(page, '[data-toast]')).toHaveText('Copied 1 change')
   await expect(o(page, '.tooltip')).toHaveCount(0)
+  const t = (await o(page, '[data-toast]').boundingBox())!
+  const c = (await copy.boundingBox())!
+  expect(Math.abs(t.x + t.width / 2 - (c.x + c.width / 2))).toBeLessThanOrEqual(1)
+  // The copy icon crossfades to a check, and back once the message goes.
+  const swaps = copy.locator('.swap')
+  await expect(swaps.nth(0)).toHaveClass(/off/)
+  await expect(swaps.nth(1)).not.toHaveClass(/off/)
   // The pointer never moved: once the message goes, the tip is back with what's true now.
   await expect(o(page, '[data-toast]')).toHaveCount(0, { timeout: 4000 })
   await expect(o(page, '.tooltip')).toHaveText('Nothing saved yet')
+  await expect(swaps.nth(1)).toHaveClass(/off/)
+  await expect(swaps.nth(0)).not.toHaveClass(/off/)
+})
+
+test('the panel grows in when a click opens it from nothing, and swaps in place after', async ({ page }) => {
+  await start(page)
+  await page.locator('h1').first().click({ force: true })
+  const panel = o(page, '.panel')
+  await expect(panel).toHaveAttribute('data-enter', 'true')
+  // Moving through the hierarchy from the keyboard: no entrance.
+  await page.keyboard.press('Shift+Enter')
+  await expect(panel).not.toHaveAttribute('data-enter', /.*/)
+  // Clicking another element while one is selected: no entrance either.
+  await chip(page, 'X').click({ force: true })
+  await expect(panel).not.toHaveAttribute('data-enter', /.*/)
+})
+
+test('a reset shows the original value even when the site transitions the property', async ({ page }) => {
+  await start(page)
+  await page.addStyleTag({ content: '.link-chip { transition: background-color 200ms ease }' })
+  await chip(page, 'X').click({ force: true })
+  await o(page, '.tab[data-category="Appearance"]').click()
+  const hex = field(page, 'background-color').locator('input.hex')
+  const before = await hex.inputValue()
+  await hex.fill('B63333')
+  await hex.press('Enter')
+  await expect.poll(() => css(page, '.link-chip', 'background-color')).toBe('rgb(182, 51, 51)')
+  // Safari keeps focus in the field when a button is clicked.
+  await o(page, '[data-row~="background-color"] .reset').dispatchEvent('click')
+  await expect(hex).toHaveValue(before)
 })

@@ -54,6 +54,10 @@ export function App({ store, host, resolveSource, report }: AppProps) {
   // Shown when the clipboard is unavailable (plain http on a phone).
   const [manualCopy, setManualCopy] = useState<string | null>(null)
   const toastTimer = useRef<number>()
+  // The panel grows out of the dock only when a click opens it from nothing.
+  // Switching elements, or Enter and Shift Enter, swap it in place.
+  const [enter, setEnter] = useState(false)
+  const copied = !!toast?.startsWith('Copied')
   // Opening or closing from the keyboard skips the expand animation.
   const [instant, setInstant] = useState(false)
   // The eye: hides the numbered badges on the page, never the changes themselves
@@ -65,18 +69,73 @@ export function App({ store, host, resolveSource, report }: AppProps) {
   const effectiveScope: Scope = multi ? scope : 'this'
 
   const shield = useRef<HTMLDivElement>(null)
-  const shieldHandlers = useInspect(open && inspecting, host, shield, setHovered, setSelected)
+  const pick = (el: Element) => {
+    setEnter(!selected)
+    setSelected(el)
+  }
+  const shieldHandlers = useInspect(open && inspecting, host, shield, setHovered, pick)
 
   // Drop the selection if the element leaves the page (HMR, route change).
   useEffect(() => {
     if (selected && !selected.isConnected) setSelected(null)
   })
 
-  const flash = (msg: string, ms = 1800) => {
+  // Fields show computed values, read when the panel renders. A site that
+  // transitions a property (a button's background) is still mid way when a
+  // reset, undo or redo re-renders, so the field would keep the old value.
+  // Read again once a transition on the element, inside it or its parent ends,
+  // and when its size settles (the Hug and Fill readouts measure it).
+  useEffect(() => {
+    if (!selected) return
+    let frame = 0
+    const again = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => rerender(0))
+    }
+    const settle = (e: Event) => {
+      const t = e.target as Element
+      if (t === selected || selected.contains(t) || t === selected.parentElement) again()
+    }
+    document.addEventListener('transitionend', settle, true)
+    document.addEventListener('transitioncancel', settle, true)
+    const sized = new ResizeObserver(again)
+    sized.observe(selected)
+    return () => {
+      sized.disconnect()
+      cancelAnimationFrame(frame)
+      document.removeEventListener('transitionend', settle, true)
+      document.removeEventListener('transitioncancel', settle, true)
+    }
+  }, [selected])
+
+  // Which button a message is about, so it can sit right above it.
+  const toastAnchor = useRef<'copy' | 'trash'>('copy')
+  const toastRef = useRef<HTMLSpanElement>(null)
+  const flash = (msg: string, ms = 1800, anchor: 'copy' | 'trash' = 'copy') => {
+    toastAnchor.current = anchor
     setToast(msg)
     clearTimeout(toastTimer.current)
     toastTimer.current = window.setTimeout(() => setToast(null), ms)
   }
+
+  // Centered over its button: copy for Saved and Copied (the saved count
+  // lives there), trash for Deleted, the pencil while Courier is collapsed.
+  // Kept inside the screen. Beside the pill while a panel is open.
+  useLayoutEffect(() => {
+    const t = toastRef.current
+    if (!t || selected) {
+      if (t) t.style.left = ''
+      return
+    }
+    const wrap = t.parentElement!
+    const tool = wrap.querySelector(`[data-tool="${open ? toastAnchor.current : 'launcher'}"]`)
+    if (!tool) return
+    const w = wrap.getBoundingClientRect()
+    const b = tool.getBoundingClientRect()
+    const half = t.offsetWidth / 2
+    const center = Math.max(8 + half, Math.min(b.left + b.width / 2, innerWidth - 8 - half))
+    t.style.left = `${center - w.left}px`
+  }, [toast, open, selected])
 
   // Say what came back after a reload, and what couldn't.
   useEffect(() => {
@@ -123,7 +182,7 @@ export function App({ store, host, resolveSource, report }: AppProps) {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
     copyIcon.current?.animate(
       [0, -3, 3, -2, 2, 0].map((x) => ({ transform: `translateX(${x}px)` })),
-      { duration: 320, easing: 'ease-in-out' },
+      { duration: 280, easing: 'ease-in-out' },
     )
   }
 
@@ -161,7 +220,7 @@ export function App({ store, host, resolveSource, report }: AppProps) {
     store.batch(() => keys.forEach((k) => store.reset(k)))
     store.save()
     setSelected(null)
-    flash(`Deleted ${keys.length} ${keys.length === 1 ? 'change' : 'changes'}`)
+    flash(`Deleted ${keys.length} ${keys.length === 1 ? 'change' : 'changes'}`, 1800, 'trash')
   }
 
   /**
@@ -178,13 +237,19 @@ export function App({ store, host, resolveSource, report }: AppProps) {
   // Up to the parent: the way to reach a container its children completely cover.
   const selectParent = () => {
     const p = latest.current.selected && selectableParent(latest.current.selected)
-    if (p) setSelected(p)
+    if (p) {
+      setEnter(false)
+      setSelected(p)
+    }
   }
 
   // Down into the element: how a link's inner row is reached, since clicks pick the link.
   const selectChild = () => {
     const c = latest.current.selected && selectableChild(latest.current.selected)
-    if (c) setSelected(c)
+    if (c) {
+      setEnter(false)
+      setSelected(c)
+    }
   }
 
   const cancel = () => {
@@ -359,7 +424,7 @@ export function App({ store, host, resolveSource, report }: AppProps) {
           onPick={(el) => {
             setInstant(false)
             setOpen(true)
-            setSelected(el)
+            pick(el)
           }}
         />
       )}
@@ -400,6 +465,7 @@ export function App({ store, host, resolveSource, report }: AppProps) {
               onChild={selectChild}
               panelProps={{
                 onPointerDown: startDrag,
+                'data-enter': enter || undefined,
                 // Offsets, not a transform: a transform would become the
                 // containing block for the fixed choices and color picker.
                 style: offset.x || offset.y ? { position: 'relative', left: offset.x, top: offset.y } : undefined,
@@ -414,7 +480,7 @@ export function App({ store, host, resolveSource, report }: AppProps) {
         */}
         <div class="toolbar-wrap">
           {toast && (
-            <span class={`toast${selected ? ' beside' : ''}`} role="status" data-toast>
+            <span class={`toast${selected ? ' beside' : ''}`} role="status" data-toast ref={toastRef}>
               {toast}
             </span>
           )}
@@ -436,13 +502,20 @@ export function App({ store, host, resolveSource, report }: AppProps) {
               <button
                 class="tool"
                 aria-label="Copy all saved changes"
+                data-tool="copy"
                 aria-hidden={!open}
                 tabIndex={open ? 0 : -1}
                 data-tip={total ? 'Copy all saved changes' : 'Nothing saved yet'}
                 onClick={copy}
               >
-                <span class="tool-icon" ref={copyIcon}>
-                  {toast?.startsWith('Copied') ? <Check size={18} /> : <Copy size={18} />}
+                {/* Both stay mounted so copied and back crossfade. */}
+                <span class={`tool-icon swap-box${copied ? ' copied' : ''}`} ref={copyIcon}>
+                  <span class={`swap${copied ? ' off' : ''}`}>
+                    <Copy size={18} />
+                  </span>
+                  <span class={`swap${copied ? '' : ' off'}`}>
+                    <Check size={18} />
+                  </span>
                 </span>
                 {saved > 0 && (
                   <span class="badge" data-saved>
@@ -453,6 +526,7 @@ export function App({ store, host, resolveSource, report }: AppProps) {
               <button
                 class="tool"
                 aria-label="Delete all changes"
+                data-tool="trash"
                 aria-hidden={!open}
                 tabIndex={open ? 0 : -1}
                 data-trash
@@ -465,6 +539,7 @@ export function App({ store, host, resolveSource, report }: AppProps) {
               <button
                 class={`tool launcher${open ? ' is-open' : ''}`}
                 data-courier-launcher
+                data-tool="launcher"
                 aria-label={open ? 'Close' : 'Open Courier'}
                 data-tip={open ? 'Close' : 'Edit styles'}
                 onClick={(e) => {

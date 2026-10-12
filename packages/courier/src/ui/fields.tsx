@@ -41,15 +41,29 @@ function useDraft(display: string, value: string, onChange: OnChange) {
   const [invalid, setInvalid] = useState(false)
   const sent = useRef(new Set<string>())
   const prevValue = useRef(value)
+  const input = useRef<HTMLInputElement | null>(null)
+  // A live value (a Fill width settling) can land between focusing, which
+  // selects everything, and the first keystroke. Replacing the text drops the
+  // selection, so the keystroke would append ("622" then "90" made "62290").
+  const reselect = useRef(false)
   useEffect(() => {
     const changed = prevValue.current !== value
     prevValue.current = value
     const echo = changed && sent.current.has(value)
     if (!editing || (changed && !echo)) {
+      const el = input.current
+      // Focus is read from the page: the editing state may not have caught up yet.
+      const focused = !!el && (el.getRootNode() as Document | ShadowRoot).activeElement === el
+      reselect.current = focused && el!.selectionStart === 0 && el!.selectionEnd === el!.value.length
       setDraft(display)
       setInvalid(false)
     }
   }, [display, value, editing])
+  useLayoutEffect(() => {
+    if (!reselect.current) return
+    reselect.current = false
+    input.current?.select()
+  }, [draft])
   const send: OnChange = (v, coalesce) => {
     sent.current.add(v)
     onChange(v, coalesce)
@@ -61,6 +75,7 @@ function useDraft(display: string, value: string, onChange: OnChange) {
     value: draft,
     spellcheck: false,
     onFocus: (e: JSX.TargetedFocusEvent<HTMLInputElement>) => {
+      input.current = e.currentTarget
       setEditing(true)
       e.currentTarget.select()
       justFocused.current = true
@@ -248,9 +263,13 @@ function Choices({
   choices,
   checks,
   active = -1,
+  grow,
 }: {
   open: boolean
   choices: Choice[]
+  /** Grow out of the field. Only for menus opened by a pointer: lists that
+   *  open while typing, or from the keyboard, appear at once. */
+  grow?: boolean
   /** Menus: a check column marking the current value. */
   checks?: boolean
   /** Row highlighted from the keyboard. */
@@ -273,10 +292,13 @@ function Choices({
       last = key
       const below = innerHeight - r.bottom - 8 >= Math.min(CHOICES_MAX, choices.length * 28 + 8)
       const width = Math.max(r.width, 168)
+      const left = Math.max(8, Math.min(r.left, innerWidth - width - 8))
       setPos({
-        left: Math.max(8, Math.min(r.left, innerWidth - width - 8)),
+        left,
         width,
         ...(below ? { top: r.bottom + 4 } : { bottom: innerHeight - r.top + 4 }),
+        // Grows out of the field it belongs to.
+        transformOrigin: `${r.left + r.width / 2 - left}px ${below ? 'top' : 'bottom'}`,
       })
     }
     let id = requestAnimationFrame(function loop() {
@@ -288,7 +310,7 @@ function Choices({
   }, [open, choices.length])
   if (!open || !choices.length) return null
   return (
-    <ul class="choices" role="listbox" ref={ref} style={pos}>
+    <ul class={`choices${grow ? ' grow' : ''}`} role="listbox" ref={ref} style={pos}>
       {choices.map((c, i) => (
         <li key={c.value ?? c.label}>
           <button
@@ -501,6 +523,7 @@ export function SelectField({
     for (let i = from + dir; i >= 0 && i < list.length; i += dir) if (!list[i].disabled) return i
     return from
   }
+  const [grow, setGrow] = useState(false)
   const onKeyDown = (e: JSX.TargetedKeyboardEvent<HTMLButtonElement>) => {
     const dir = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0
     if (dir) {
@@ -526,6 +549,8 @@ export function SelectField({
           // Safari doesn't focus buttons on click; the keyboard and close on blur need focus.
           e.currentTarget.focus()
           setActive(current)
+          // A click from Enter or Space has no detail.
+          setGrow(e.detail > 0)
           setOpen(!open)
         }}
         onBlur={() => setOpen(false)}
@@ -536,6 +561,7 @@ export function SelectField({
       <Chevron />
       <Choices
         open={open}
+        grow={grow}
         checks
         active={active}
         choices={list.map((o) => ({
@@ -649,11 +675,13 @@ function Popover({ anchor, onClose, children }: { anchor: HTMLElement; onClose()
       el.style.width = `${w}px`
       const h = el.offsetHeight
       const below = innerHeight - a.bottom - 8 >= h
+      const left = Math.max(8, Math.min(a.left, innerWidth - w - 8))
       setPos({
         width: w,
-        left: Math.max(8, Math.min(a.left, innerWidth - w - 8)),
+        left,
         top: below ? a.bottom + 4 : Math.max(8, a.top - h - 4),
-        transformOrigin: below ? 'top left' : 'bottom left',
+        // Grows out of the field, like the menus.
+        transformOrigin: `${a.left + a.width / 2 - left}px ${below ? 'top' : 'bottom'}`,
       })
     }
     let id = requestAnimationFrame(function loop() {

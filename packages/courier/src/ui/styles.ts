@@ -29,6 +29,7 @@ export const css = /* css */ `
   --h: 28px;
   --r: 6px;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   position: fixed;
   inset: 0;
   z-index: 2147483647;
@@ -98,6 +99,14 @@ button:disabled { cursor: default; opacity: 0.4; }
 }
 
 .panel { pointer-events: auto; box-shadow: var(--ring), var(--lift); }
+/* Opened by a click from nothing: grows out of the dock corner. Settles on
+   transform none, since any transform would contain the fixed menus. */
+.panel[data-enter] {
+  transform-origin: bottom right;
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+  @starting-style { opacity: 0; transform: translateY(6px) scale(0.98); }
+}
+.dock.left .panel[data-enter] { transform-origin: bottom left; }
 
 /*
  * Toolbar: 40px circles in a pill with 4px padding (48px tall). The launcher
@@ -150,12 +159,27 @@ button:disabled { cursor: default; opacity: 0.4; }
 }
 .tool.on { background: rgba(255, 255, 255, 0.12); }
 .tool-icon { display: grid; }
-/* Above the pill, lined up with the launcher at its right end. While the
-   panel is open that space is the panel's footer, so it moves beside the pill. */
+/* Two icons in one spot, crossfading, with a little blur so the two shapes
+   read as one changing. Asymmetric: turning into the check answers a click,
+   so it snaps like the pencil and close morph; turning back happens on its
+   own while you look elsewhere, so it morphs gently enough to be seen. */
+.swap-box { position: relative; width: 18px; height: 18px; }
+.swap {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  transition: opacity 240ms var(--ease-in-out), transform 240ms var(--ease-in-out), filter 240ms var(--ease-in-out);
+}
+.swap-box.copied .swap { transition-duration: 160ms; transition-timing-function: var(--ease-out); }
+.swap.off { opacity: 0; transform: scale(0.8); filter: blur(2px); }
+/* Above the pill, centered over the button it's about. While the panel is
+   open that space is the panel's footer, so it moves beside the pill. */
 .toast {
   width: max-content;
   position: absolute;
-  right: 0;
+  /* Left is set from the button it's about; translate centers it there. */
+  translate: -50% 0;
   bottom: calc(100% + 8px);
   transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
   @starting-style { opacity: 0; transform: translateY(4px); }
@@ -167,11 +191,14 @@ button:disabled { cursor: default; opacity: 0.4; }
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16);
 }
 .toast.beside {
+  translate: none;
   right: calc(100% + 8px);
   bottom: auto;
   top: 50%;
   transform: translateY(-50%);
-  @starting-style { opacity: 0; transform: translate(4px, -50%); }
+  /* Switching sides is a jump, not a move: only the fade carries over. */
+  transition-property: opacity;
+  @starting-style { opacity: 0; }
 }
 
 .badge {
@@ -244,7 +271,7 @@ button:disabled { cursor: default; opacity: 0.4; }
   opacity: 0;
   transform: translate(-50%, 4px);
   pointer-events: none;
-  transition: opacity 150ms ease, transform 150ms cubic-bezier(0.23, 1, 0.32, 1);
+  transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
 }
 /* While there's more below, the content fades out under the arrow. A layer on
    top, not a mask, so menus opened inside the body aren't clipped by it. */
@@ -259,7 +286,7 @@ button:disabled { cursor: default; opacity: 0.4; }
   background: linear-gradient(to bottom, transparent, var(--body));
   pointer-events: none;
   opacity: 0;
-  transition: opacity 150ms ease;
+  transition: opacity 150ms var(--ease-out);
 }
 .body-wrap.fade-bottom::after { opacity: 1; }
 .scroll-more { z-index: 2; }
@@ -281,6 +308,11 @@ button:disabled { cursor: default; opacity: 0.4; }
   color: #fff;
 }
 .icon-btn.flat { background: none; color: var(--muted); }
+/* Press feedback on everything pressable. Fields and menu rows are left still. */
+.tool, .icon-btn, .btn, .add-btn { transition: transform 160ms var(--ease-out); }
+.tool:active:not(:disabled), .icon-btn:active:not(:disabled), .btn:active:not(:disabled), .add-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
 .icon-btn:hover:not(:disabled) { background: var(--chip-hover); color: #fff; }
 .icon-btn.flat.on { background: #3a3a3a; color: #fff; }
 
@@ -517,6 +549,10 @@ select option { color: #111; }
   background: #2b2b2b;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), var(--lift);
 }
+.choices.grow {
+  transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
+  @starting-style { opacity: 0; transform: scale(0.97); }
+}
 .choices button {
   width: 100%;
   height: var(--h);
@@ -606,7 +642,7 @@ select option { color: #111; }
 }
 .seg button:hover:not(.on) { color: #fff; }
 .seg button.on { background: var(--body); color: #fff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
-.seg-icon { display: grid; transition: transform 160ms cubic-bezier(0.2, 0, 0, 1); }
+.seg-icon { display: grid; transition: transform 160ms var(--ease-out); }
 
 /* Footer */
 .check-row { position: relative; display: flex; align-items: center; gap: 10px; color: var(--muted); cursor: pointer; }
@@ -690,9 +726,14 @@ select option { color: #111; }
   background: #2a2a2a;
   pointer-events: auto;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), var(--lift);
+  transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
+  @starting-style { opacity: 0; transform: scale(0.97); }
 }
 
+/* Reduced motion: fades stay, since they explain what appeared. Movement,
+   scaling and reveals go. */
 @media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; }
+  * { transition-property: opacity !important; }
+  .tool:active, .icon-btn:active, .btn:active, .add-btn:active { transform: none !important; }
 }
 `
