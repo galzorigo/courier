@@ -150,19 +150,28 @@ button:disabled { cursor: default; opacity: 0.4; }
 }
 .tool.on { background: rgba(255, 255, 255, 0.12); }
 .tool-icon { display: grid; }
-/* Beside the pill, so it never lands on the panel above. */
+/* Above the pill, lined up with the launcher at its right end. While the
+   panel is open that space is the panel's footer, so it moves beside the pill. */
 .toast {
   width: max-content;
   position: absolute;
-  right: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
+  right: 0;
+  bottom: calc(100% + 8px);
+  transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
+  @starting-style { opacity: 0; transform: translateY(4px); }
   padding: 4px 8px;
   border-radius: var(--r);
   background: #000;
   color: #fff;
   white-space: nowrap;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+.toast.beside {
+  right: calc(100% + 8px);
+  bottom: auto;
+  top: 50%;
+  transform: translateY(-50%);
+  @starting-style { opacity: 0; transform: translate(4px, -50%); }
 }
 
 .badge {

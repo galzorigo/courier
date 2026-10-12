@@ -414,7 +414,7 @@ export function App({ store, host, resolveSource, report }: AppProps) {
         */}
         <div class="toolbar-wrap">
           {toast && (
-            <span class="toast" role="status">
+            <span class={`toast${selected ? ' beside' : ''}`} role="status" data-toast>
               {toast}
             </span>
           )}
@@ -494,7 +494,7 @@ export function App({ store, host, resolveSource, report }: AppProps) {
           )}
         </div>
       </div>
-      <Tooltip root={host.shadowRoot!} />
+      <Tooltip root={host.shadowRoot!} quiet={!!toast} />
     </>
   )
 }
@@ -536,17 +536,35 @@ function Markers({ store, selected, onPick }: { store: ChangeStore; selected: El
 /**
  * One tooltip for every [data-tip], drawn above everything so the panel's
  * rounded clipping can't cut it off. Flips below near the top of the screen
- * and stays inside the viewport.
+ * and stays inside the viewport. Quiet while a message shows, so the two never
+ * stack up (pressing copy turns its tip into "Nothing saved yet" right under the
+ * "Copied" message); once the message goes, a still hovered tip comes back.
  */
-function Tooltip({ root }: { root: ShadowRoot }) {
-  const [tip, setTip] = useState<{ text: string; rect: DOMRect } | null>(null)
+function Tooltip({ root, quiet }: { root: ShadowRoot; quiet: boolean }) {
+  const [target, setTarget] = useState<HTMLElement | null>(null)
+  // A press hides the tip until the pointer leaves, or until the message it
+  // caused has gone.
+  const [held, setHeld] = useState(false)
+  const wasQuiet = useRef(quiet)
+  useEffect(() => {
+    if (wasQuiet.current && !quiet) setHeld(false)
+    wasQuiet.current = quiet
+  }, [quiet])
+  // Read at render time, so a tip that comes back after a message is current.
+  const text = target?.isConnected ? target.dataset.tip : undefined
+  const tip = text && !quiet && !held ? { text, rect: target!.getBoundingClientRect() } : null
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const over = (e: Event) => {
       const t = (e.target as Element).closest?.('[data-tip]') as HTMLElement | null
-      setTip(t?.dataset.tip ? { text: t.dataset.tip, rect: t.getBoundingClientRect() } : null)
+      const next = t?.dataset.tip ? t : null
+      setTarget((prev) => {
+        if (prev !== next) setHeld(false)
+        return next
+      })
     }
-    const hide = () => setTip(null)
+    const hide = () => setTarget(null)
+    const press = () => setHeld(true)
     // pointerout fires on the element being left and says where the pointer
     // went; leaving for anything without its own tip (or the page) hides it.
     const out = (e: Event) => {
@@ -556,11 +574,11 @@ function Tooltip({ root }: { root: ShadowRoot }) {
     }
     root.addEventListener('pointerover', over)
     root.addEventListener('pointerout', out)
-    root.addEventListener('pointerdown', hide)
+    root.addEventListener('pointerdown', press)
     return () => {
       root.removeEventListener('pointerover', over)
       root.removeEventListener('pointerout', out)
-      root.removeEventListener('pointerdown', hide)
+      root.removeEventListener('pointerdown', press)
     }
   }, [root])
   useLayoutEffect(() => {
@@ -573,7 +591,7 @@ function Tooltip({ root }: { root: ShadowRoot }) {
     el.style.left = `${Math.max(8, Math.min(rect.left + rect.width / 2 - w / 2, innerWidth - w - 8))}px`
     el.style.top = `${above ? rect.top - h - 6 : rect.bottom + 6}px`
     el.style.visibility = 'visible'
-  }, [tip])
+  }, [tip?.text, tip?.rect.left, tip?.rect.top])
   if (!tip) return null
   return (
     <div class="tooltip" role="tooltip" ref={ref} key={tip.text + tip.rect.left + tip.rect.top}>

@@ -29,6 +29,7 @@ import {
   type Category,
   type Option,
   type Owner,
+  type SiblingSpacing,
   type SizeAxis,
   type SizeMode,
 } from '../core'
@@ -363,7 +364,7 @@ function LayoutBody({ size, spacing: showSpacing }: { size: boolean; spacing: bo
           />
         </Row>
       )}
-      {(gaps.length > 0 || spacing) && <GapRow gaps={gaps} owner={gapOwner} />}
+      {(gaps.length > 0 || gapBetween(spacing)) && <GapRow gaps={gaps} owner={gapOwner} />}
       {showSpacing && <SpacingBody />}
     </>
   )
@@ -468,61 +469,49 @@ function Tabs({
 }
 
 /**
- * Gap, in one row: the element's own gap ("Inside") and the measured gap to
- * its siblings ("Between"), which may live on the parent, on a margin, or
- * come from somewhere read only. The note under the row names the owner.
+ * Whether the space to the siblings involves a real gap property, the parent's.
+ * Space made by margins or by justify content is not a gap: margins are edited
+ * in the Margin row, and Gap doesn't show for them at all.
+ */
+function gapBetween(spacing: SiblingSpacing | null): boolean {
+  const s = spacing?.source
+  return !!s && (s.kind === 'parent-gap' || (s.kind === 'mixed' && s.parts[0].startsWith('parent')))
+}
+
+/**
+ * Gap, in one row: the element's own gap ("Inside") and the parent's gap to
+ * its siblings ("Between"). The note under the row names the owner.
  */
 function GapRow({ gaps, owner = 'self' }: { gaps: string[]; owner?: Owner }) {
   const ed = useEditor()
   const spacing = measureSiblingSpacing(ed.el)
   const s = spacing?.source
-  const pretty = (p: string) => p.replace(/-/g, ' ')
   const inside = <Glyph name="gap-inside" />
   const between = <Glyph name="gap-between" />
   const betweenTip = 'Gap between siblings'
 
   let sibling = null
   let note: string | undefined
-  const gapProps = [...gaps]
-  const selfProps: string[] = []
   let parentProps: string[] = []
-  if (spacing && s) {
-    if (s.kind === 'parent-gap') {
-      parentProps = [s.property]
-      note = `Between is set on the parent, affects all ${s.count}`
-      sibling = (
-        <div data-sibling-gap="parent">
-          <NumberField property={s.property} owner="parent" prefix={between} tip={betweenTip} units={BOX} min={0} />
-        </div>
-      )
-    } else if (s.kind === 'margin' && s.owner === 'self') {
-      selfProps.push(s.property)
-      const who = ed.scope === 'all' ? `all ${ed.matches.length} matching` : 'this element'
-      note = `Between is set as ${pretty(s.property)} on ${who}`
-      sibling = (
-        <div data-sibling-gap="margin">
-          <NumberField property={s.property} prefix={between} tip={betweenTip} units={BOX} />
-        </div>
-      )
-    } else {
-      note =
-        s.kind === 'margin'
-          ? `Between is set as ${pretty(s.property)} on the neighbouring sibling. Select it to edit`
-          : s.kind === 'space-distribution'
-            ? `Between comes from justify content ${aliased('justify-content', s.justify).replace(/-/g, ' ')} on the parent`
-            : s.kind === 'mixed'
-              ? `Between is made of ${s.parts.join(' and ')}`
-              : 'Between has no identifiable source, so it is read only'
-      sibling = (
-        <div data-sibling-gap="readonly">
-          <ReadOnly value={`${spacing.distance}px`} prefix={between} tip={betweenTip} />
-        </div>
-      )
-    }
+  if (spacing && s?.kind === 'parent-gap') {
+    parentProps = [s.property]
+    note = `Between is set on the parent, affects all ${s.count}`
+    sibling = (
+      <div data-sibling-gap="parent">
+        <NumberField property={s.property} owner="parent" prefix={between} tip={betweenTip} units={BOX} min={0} />
+      </div>
+    )
+  } else if (spacing && s?.kind === 'mixed' && gapBetween(spacing)) {
+    note = `Between is made of ${s.parts.join(' and ')}`
+    sibling = (
+      <div data-sibling-gap="readonly">
+        <ReadOnly value={`${spacing.distance}px`} prefix={between} tip={betweenTip} />
+      </div>
+    )
   }
   const cells = gaps.length + (sibling ? 1 : 0)
   return (
-    <Row label="Gap" props={gapProps} owner={owner} parentProps={parentProps} more={[{ props: selfProps, owner: 'self' }]} note={note}>
+    <Row label="Gap" props={gaps} owner={owner} parentProps={parentProps} note={note}>
       <div class="grid2" style={{ gridTemplateColumns: `repeat(${cells}, minmax(0, 1fr))` }}>
         {gaps.map((p) => (
           <NumberField

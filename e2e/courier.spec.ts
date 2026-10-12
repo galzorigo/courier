@@ -312,14 +312,16 @@ test('copy exports everything saved, grouped by scope, then clears', async ({ pa
   await expect.poll(() => css(page, '.link-chip', 'padding-left')).toBe('12px')
 })
 
-test('sibling gap identifies margins and space distribution', async ({ page }) => {
+test('space made by margins or justify content is not a gap', async ({ page }) => {
   await open(page)
+  // Spaced by its own margin bottom: that's the Margin row, and there's no Gap.
   await page.locator('.feature').nth(1).click({ force: true })
   await tab(page, 'Layout')
-  await expect(o(page, '[data-sibling-gap="margin"]')).toBeVisible()
-  await expect(o(page, '.pnote')).toContainText('Between is set as margin bottom on this element')
+  await expect(o(page, '[data-sibling-gap]')).toHaveCount(0)
+  await expect(o(page, '[data-property="margin-bottom"]')).toBeVisible()
+  // Spaced by the parent's justify content: no gap either.
   await page.locator('.logo').click({ force: true })
-  await expect(o(page, '.pnote')).toContainText('justify content space between')
+  await expect(o(page, '[data-sibling-gap]')).toHaveCount(0)
 })
 
 test('escape deselects, close keeps pending changes', async ({ page }) => {

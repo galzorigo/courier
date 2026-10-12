@@ -495,3 +495,43 @@ test('on a dark page the ambient shadow gives way to the hairline', async ({ pag
   await page.evaluate(() => (document.body.style.background = '#fafafa'))
   await expect(root).not.toHaveClass(/on-dark/)
 })
+
+test('the saved message shows above the bar, and moves beside it when a panel opens', async ({ page }) => {
+  await start(page)
+  await chip(page, 'X').click({ force: true })
+  await field(page, 'padding-inline').locator('input').fill('20')
+  await expect.poll(() => css(page, '.link-chip', 'padding-left')).toBe('20px')
+  await o(page, '.btn-primary').click()
+  const toast = o(page, '[data-toast]')
+  await expect(toast).toHaveText('Saved')
+  const bar = (await o(page, '.toolbar').boundingBox())!
+  const above = (await toast.boundingBox())!
+  expect(above.y + above.height).toBeLessThanOrEqual(bar.y)
+  expect(Math.round(above.x + above.width)).toBe(Math.round(bar.x + bar.width))
+
+  // Picking an element while it still shows: above the bar is now the panel's footer.
+  await chip(page, 'X').click({ force: true })
+  await expect(o(page, '.panel')).toHaveCount(1)
+  await expect(toast).toHaveClass(/beside/)
+  const beside = (await toast.boundingBox())!
+  expect(beside.x + beside.width).toBeLessThanOrEqual(bar.x)
+})
+
+test('a tooltip waits for the message its press caused, then comes back current', async ({ page }) => {
+  await start(page)
+  await chip(page, 'X').click({ force: true })
+  await field(page, 'padding-inline').locator('input').fill('20')
+  await expect.poll(() => css(page, '.link-chip', 'padding-left')).toBe('20px')
+  await o(page, '.btn-primary').click()
+  await expect(o(page, '[data-toast]')).toHaveCount(0, { timeout: 4000 })
+
+  const copy = o(page, '[aria-label="Copy all saved changes"]')
+  await copy.hover()
+  await expect(o(page, '.tooltip')).toHaveText('Copy all saved changes')
+  await copy.click()
+  await expect(o(page, '[data-toast]')).toHaveText('Copied 1 change')
+  await expect(o(page, '.tooltip')).toHaveCount(0)
+  // The pointer never moved: once the message goes, the tip is back with what's true now.
+  await expect(o(page, '[data-toast]')).toHaveCount(0, { timeout: 4000 })
+  await expect(o(page, '.tooltip')).toHaveText('Nothing saved yet')
+})
