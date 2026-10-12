@@ -1,6 +1,6 @@
 {
   "name": "@galzorigo/courier",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Edit styles on your running site like in Figma, then copy exact before and after values for your coding agent. Dev only, no AI inside.",
   "license": "MIT",
   "author": "Gal Zorigo",
