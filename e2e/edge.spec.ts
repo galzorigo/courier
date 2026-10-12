@@ -574,3 +574,14 @@ test('a reset shows the original value even when the site transitions the proper
   await o(page, '[data-row~="background-color"] .reset').dispatchEvent('click')
   await expect(hex).toHaveValue(before)
 })
+
+test("a page's selection color can't hide a selected value", async ({ page }) => {
+  await start(page)
+  // Like a site that styles selection with a few percent black.
+  await page.addStyleTag({ content: '::selection { background: rgba(0, 0, 0, 0.08) }' })
+  await chip(page, 'X').click({ force: true })
+  const input = field(page, 'padding-inline').locator('input')
+  await input.click()
+  expect(await input.evaluate((el: HTMLInputElement) => [el.selectionStart, el.selectionEnd, el.value.length])).toEqual([0, 2, 2])
+  expect(await input.evaluate((el) => getComputedStyle(el, '::selection').backgroundColor)).toBe('rgba(59, 130, 246, 0.45)')
+})

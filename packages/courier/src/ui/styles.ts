@@ -51,6 +51,10 @@ button, input, select, textarea { font: inherit; letter-spacing: inherit; color:
 /* Labels, tabs and buttons aren't content: only what you type is selectable. */
 .root { -webkit-user-select: none; user-select: none; }
 input, textarea { -webkit-user-select: text; user-select: text; }
+/* Our own highlight: a page's ::selection reaches in here, and a subtle one
+   (a few percent black) is invisible on the dark fields, so a selected value
+   looked unselected. */
+::selection { background: rgba(59, 130, 246, 0.45); color: #fff; }
 button { cursor: pointer; border: 0; background: none; padding: 0; }
 button:disabled { cursor: default; opacity: 0.4; }
 :focus-visible { outline: 2px solid var(--hl); outline-offset: 1px; }
