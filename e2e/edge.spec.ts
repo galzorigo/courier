@@ -585,3 +585,12 @@ test("a page's selection color can't hide a selected value", async ({ page }) =>
   expect(await input.evaluate((el: HTMLInputElement) => [el.selectionStart, el.selectionEnd, el.value.length])).toEqual([0, 2, 2])
   expect(await input.evaluate((el) => getComputedStyle(el, '::selection').backgroundColor)).toBe('rgba(59, 130, 246, 0.45)')
 })
+
+test('individual corners read like the box: top left, top right, bottom left, bottom right', async ({ page }) => {
+  await start(page)
+  await chip(page, 'X').click({ force: true })
+  await o(page, '.tab[data-category="Appearance"]').click()
+  await o(page, '[aria-label="Individual corners"]').click()
+  const order = await o(page, '[data-row~="border-radius"] [data-property]').evaluateAll((els) => els.map((e) => e.getAttribute('data-property')))
+  expect(order).toEqual(['border-top-left-radius', 'border-top-right-radius', 'border-bottom-left-radius', 'border-bottom-right-radius'])
+})

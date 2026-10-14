@@ -627,12 +627,17 @@ function Sides({
   const [open, setOpen] = useState(!canCollapse)
   const expanded = open || !canCollapse
   const corners = group === 'border-radius'
+  // Corners read as the box they shape: top left, top right, then bottom left,
+  // bottom right underneath (CSS lists them clockwise, ending bottom right, bottom left).
+  const [tl, tr, br, bl] = g.sides
   const fields = only
     ? expanded
       ? only.expanded
       : only.collapsed
     : expanded
-      ? g.sides
+      ? corners
+        ? [tl, tr, bl, br]
+        : g.sides
       : g.inline
         ? [g.inline, g.block!]
         : [g.all]
