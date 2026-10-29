@@ -8,6 +8,7 @@ export type Category =
   | 'Shape'
   | 'Fill'
   | 'Border'
+  | 'Shadow'
   | 'Text'
   | 'Icon'
   | 'Other'
@@ -19,6 +20,7 @@ export const CATEGORIES: Category[] = [
   'Shape',
   'Fill',
   'Border',
+  'Shadow',
   'Text',
   'Icon',
 ]
@@ -66,6 +68,8 @@ put('Border', [
   ...sides('border', '-style'),
   ...sides('border', '-color'),
 ])
+// One property holding every layer, like Figma's effects list.
+put('Shadow', ['box-shadow'])
 put('Text', [
   'color',
   'font-family',
@@ -261,6 +265,8 @@ const specs: Record<string, PropertySpec> = {
     label: 'Style',
     control: { kind: 'select', options: ['none', 'solid', 'dashed', 'dotted', 'double'] },
   },
+
+  'box-shadow': { label: 'Shadow', control: { kind: 'text' } },
 
   color: { label: 'Color', control: { kind: 'color' } },
   'font-family': { label: 'Font', control: { kind: 'text' } },

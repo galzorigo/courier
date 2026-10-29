@@ -54,7 +54,7 @@ export default function CourierDev() {
 ## Use
 
 1. Click the pencil in the bottom right corner. Hover the page to highlight elements, click one to select it.
-2. Edit it in the panel. Layout (display, direction, size as Fixed, Hug or Fill, gap, padding, margin), Appearance (fill, radius, border), Text and Icon. Only the controls that do something for that element are shown, and missing ones can be added.
+2. Edit it in the panel. Layout (display, direction, size as Fixed, Hug or Fill, gap, padding, margin), Appearance (fill, radius, border, shadow layers), Text and Icon. Only the controls that do something for that element are shown, and missing ones can be added.
 3. Tick **Apply to all matching elements** to change every element that shares its style, including the same element inside repeated cards.
 4. **Save**, then copy everything with the copy button and paste it into your agent.
 

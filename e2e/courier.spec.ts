@@ -247,7 +247,7 @@ test('hex color picker replaces the system dialog', async ({ page }) => {
   await expect.poll(() => css(page, '.link-chip', 'background-color', 3)).not.toBe('rgb(238, 244, 255)')
 })
 
-test('controls are 28px tall with 6px corners and 14px text', async ({ page }) => {
+test('controls are 28px tall with 6px corners and 13px text', async ({ page }) => {
   await open(page)
   await select(page, 'X')
   const sizes = await o(page, '.panel').evaluate((panel) =>
@@ -261,7 +261,7 @@ test('controls are 28px tall with 6px corners and 14px text', async ({ page }) =
   const fonts = await o(page, '.panel').evaluate((panel) =>
     [...new Set([...panel.querySelectorAll('*')].filter((el) => !el.closest('.badge, .tab-count') && el.childNodes.length && [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent!.trim())).map((el) => getComputedStyle(el).fontSize))],
   )
-  expect(fonts).toEqual(['14px'])
+  expect(fonts).toEqual(['13px'])
 })
 
 test('scope checkbox applies to all matching siblings and their icons', async ({ page }) => {
@@ -635,8 +635,8 @@ test('toolbar: the pencil opens Courier and turns into the close button in place
   const bar = o(page, '.toolbar')
   const launcher = o(page, '[data-courier-launcher]')
   const before = (await launcher.boundingBox())!
-  expect([before.width, before.height]).toEqual([40, 40])
-  expect((await bar.boundingBox())!.height).toBe(48)
+  expect([before.width, before.height]).toEqual([36, 36])
+  expect((await bar.boundingBox())!.height).toBe(44)
   await expect(launcher).toHaveAttribute('aria-label', 'Open Courier')
   // Collapsed: eye and copy are clipped away and out of the tab order.
   await expect(o(page, '[aria-label="Copy all saved changes"]')).toHaveAttribute('tabindex', '-1')
@@ -821,4 +821,77 @@ test('a down arrow shows while there is more below, and goes once scrolled to th
   await page.locator('.section h2').first().click({ force: true })
   await tab(page, 'Appearance')
   await expect(more).not.toHaveClass(/show/)
+})
+
+test('shadow: add, edit and remove layers like Figma effects, then export the whole value', async ({ page }) => {
+  await open(page)
+  await select(page, 'X')
+  await tab(page, 'Appearance')
+  await o(page, '[data-add="Shadow"]').click()
+  // Figma's default drop shadow.
+  await expect.poll(() => css(page, '.link-chip', 'box-shadow')).toBe('rgba(0, 0, 0, 0.25) 0px 4px 4px 0px')
+
+  const layer = (i: number) => o(page, `[data-shadow-layer="${i}"]`)
+  await layer(0).locator('[data-shadow-field="blur"] input').fill('12')
+  await layer(0).locator('[data-shadow-field="y"] input').fill('-2')
+  await expect.poll(() => css(page, '.link-chip', 'box-shadow')).toBe('rgba(0, 0, 0, 0.25) 0px -2px 12px 0px')
+
+  // A second layer, turned into an inner shadow with its own color.
+  await o(page, '[data-add-shadow]').click()
+  await choose(layer(1).locator('.field.select button').first(), 'inner')
+  await layer(1).locator('[data-shadow-field="color"] input.hex').fill('FFFFFF')
+  await layer(1).locator('[data-shadow-field="spread"] input').fill('1')
+  await expect
+    .poll(() => css(page, '.link-chip', 'box-shadow'))
+    .toBe('rgba(0, 0, 0, 0.25) 0px -2px 12px 0px, rgba(255, 255, 255, 0.25) 0px 4px 4px 1px inset')
+
+  await saveBtn(page).click()
+  await copyBtn(page).click()
+  const text = await page.evaluate(() => navigator.clipboard.readText())
+  expect(text).toContain('Changes: 1 (Shadow 1)')
+  expect(text).toContain('  box-shadow: none → 0px -2px 12px 0px #00000040, inset 0px 4px 4px 1px #FFFFFF40')
+})
+
+test('shadow: an existing multi layer shadow shows every layer, and removing them all says Removed', async ({ page }) => {
+  await page.goto('/')
+  await page.addStyleTag({ content: '.link-chip { box-shadow: 0 1px 2px rgba(0,0,0,.3), inset 0 0 0 1px rgba(255,255,255,.1) !important }' })
+  await o(page, '[data-courier-launcher]').click()
+  await select(page, 'X')
+  await tab(page, 'Appearance')
+  await expect(o(page, '[data-shadow-layer]')).toHaveCount(2)
+  const layer = (i: number) => o(page, `[data-shadow-layer="${i}"]`)
+  await expect(layer(0).locator('[data-shadow-field="y"] input')).toHaveValue('1')
+  await expect(layer(1).locator('[data-shadow-field="spread"] input')).toHaveValue('1')
+  await expect(layer(1).locator('[data-shadow-field="color"] input.alpha')).toHaveValue('10')
+
+  // The first remove button sits under the row's reset slot; the slot must let the pointer through.
+  const first = (await layer(0).locator('[data-remove-shadow]').boundingBox())!
+  const hit = await page.evaluate(([x, y]) => {
+    const el = document.querySelector('courier-overlay')!.shadowRoot!.elementFromPoint(x, y)
+    return !!el?.closest('[data-remove-shadow]')
+  }, [first.x + first.width / 2, first.y + first.height / 2])
+  expect(hit).toBe(true)
+
+  await layer(1).locator('[data-remove-shadow]').click()
+  await expect(o(page, '[data-shadow-layer]')).toHaveCount(1)
+  await layer(0).locator('[data-remove-shadow]').click()
+  await expect(o(page, '[data-shadow-removed]')).toBeVisible()
+  // Inline beats the page's !important only with !important, so check the change instead of the render.
+  await o(page, '[data-row="box-shadow"] .reset').click()
+  await expect(o(page, '[data-shadow-layer]')).toHaveCount(2)
+})
+
+test('a page marker says Unsaved while its edits are not saved', async ({ page }) => {
+  await open(page)
+  await select(page, 'X')
+  await field(page, 'padding-inline').locator('input').fill('20')
+  // Left without Save: the edit stays on the page, unsaved.
+  await page.keyboard.press('Escape')
+  const marker = o(page, '[data-marker]')
+  await expect(marker).toHaveText('Unsaved (1)')
+  await expect(marker).toHaveAttribute('data-tip', '1 change not saved')
+
+  await marker.click()
+  await saveBtn(page).click()
+  await expect(marker).toHaveText('1')
 })

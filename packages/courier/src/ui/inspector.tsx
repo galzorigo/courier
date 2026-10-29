@@ -14,6 +14,8 @@ import {
   isGrid,
   fontWeights,
   baseline,
+  formatShadows,
+  parseShadows,
   hasBorder,
   measureSiblingSpacing,
   shortName,
@@ -32,6 +34,7 @@ import {
   type SiblingSpacing,
   type SizeAxis,
   type SizeMode,
+  type ShadowLayer,
 } from '../core'
 import { useEditor } from './editor'
 import { ColorField, FontField, NumberField, ReadOnly, Row, SegField, SelectField, aliased, label } from './fields'
@@ -104,7 +107,7 @@ interface TabDef {
 }
 const TABS: TabDef[] = [
   { id: 'Layout', label: 'Layout', categories: ['Layout', 'Size', 'Spacing'] },
-  { id: 'Appearance', label: 'Appearance', categories: ['Fill', 'Shape', 'Border'] },
+  { id: 'Appearance', label: 'Appearance', categories: ['Fill', 'Shape', 'Border', 'Shadow'] },
   { id: 'Text', label: 'Text', categories: ['Text'] },
   { id: 'Icon', label: 'Icon', categories: ['Icon'] },
 ]
@@ -152,6 +155,7 @@ export function Inspector({
       const color = toHex(getComputedStyle(ed.el).color) ?? '#000000'
       ed.setMany({ 'border-style': 'solid', 'border-width': '1px', 'border-color': color.slice(0, 7) })
     }
+    if (c === 'Shadow') ed.set('box-shadow', 'self', formatShadows([NEW_SHADOW]))
     setAdded(new Set([...added, c]))
     setJustAdded(c)
   }
@@ -231,7 +235,7 @@ export function Inspector({
         <button class="icon-btn flat" data-tip="Redo" aria-label="Redo" disabled={!ed.store.canRedo} onClick={() => ed.store.redo()}>
           <Redo />
         </button>
-        <button class="icon-btn" aria-label="Deselect" data-tip="Deselect" onClick={onClose}>
+        <button class="icon-btn flat" aria-label="Deselect" data-tip="Deselect" onClick={onClose}>
           <Close />
         </button>
       </header>
@@ -779,6 +783,102 @@ function BorderBody({ onRemove }: { onRemove?: () => void }) {
   )
 }
 
+// Shadow: every box-shadow layer, edited like Figma's drop and inner shadows.
+
+/** Figma's default drop shadow. */
+const NEW_SHADOW: ShadowLayer = { inset: false, x: 0, y: 4, blur: 4, spread: 0, color: '#00000040' }
+
+const SHADOW_TYPES: Option[] = [
+  { value: 'drop', label: 'Drop shadow' },
+  { value: 'inner', label: 'Inner shadow' },
+]
+
+function ShadowBody({ onRemove }: { onRemove?: () => void }) {
+  const ed = useEditor()
+  const layers = parseShadows(ed.value('box-shadow'))
+  const had = baseline(ed.el, 'box-shadow') !== 'none'
+
+  // Removed: one row that says so; its reset brings the shadow back.
+  if (!layers.length && had) {
+    return (
+      <Row label="Shadow" props={['box-shadow']}>
+        <span class="removed" data-shadow-removed>
+          Removed
+        </span>
+      </Row>
+    )
+  }
+
+  const write = (next: ShadowLayer[], coalesce?: boolean) => ed.set('box-shadow', 'self', formatShadows(next), coalesce)
+  const patch = (i: number, p: Partial<ShadowLayer>) => layers.map((l, j) => (j === i ? { ...l, ...p } : l))
+  const removeLayer = (i: number) => {
+    const next = layers.filter((_, j) => j !== i)
+    // A shadow that only Courier added is simply undone; one from the code becomes none.
+    if (!next.length && !had) {
+      ed.reset('box-shadow')
+      onRemove?.()
+    } else write(next)
+  }
+  const length = (i: number, key: 'x' | 'y' | 'blur' | 'spread', prefix: ComponentChildren, tip: string) => (
+    <div data-shadow-field={key}>
+      <NumberField
+        property="box-shadow"
+        // Blur can't go below 0; offsets and spread can.
+        validateAs={key === 'blur' ? 'padding-left' : 'margin-left'}
+        min={key === 'blur' ? 0 : undefined}
+        value={`${layers[i][key]}px`}
+        units={['px']}
+        prefix={prefix}
+        tip={tip}
+        onValue={(v, c) => write(patch(i, { [key]: parseFloat(v) || 0 }), c)}
+      />
+    </div>
+  )
+
+  return (
+    // One row: a card per layer with its remove button beside it, then a
+    // full width add button under the last card.
+    // No reset: layers are removed one by one, and undo covers the rest.
+    <Row label="Shadow" props={['box-shadow']} resettable={false}>
+      <div class="shadow-stack">
+        {layers.map((l, i) => (
+          <div class="shadow-entry" key={i} data-shadow-layer={i}>
+            <div class="shadow-layer">
+              <SelectField
+                property="box-shadow"
+                value={l.inset ? 'inner' : 'drop'}
+                options={SHADOW_TYPES}
+                onValue={(v) => write(patch(i, { inset: v === 'inner' }))}
+              />
+              <div class="grid2">
+                {length(i, 'x', 'X', 'Shadow X')}
+                {length(i, 'y', 'Y', 'Shadow Y')}
+              </div>
+              <div class="grid2">
+                {length(i, 'blur', <Glyph name="blur" />, 'Blur')}
+                {length(i, 'spread', <Glyph name="spread" />, 'Spread')}
+              </div>
+              <div data-shadow-field="color">
+                <ColorField property="box-shadow" value={l.color} onValue={(v, c) => write(patch(i, { color: v }), c)} />
+              </div>
+            </div>
+            <button class="icon-btn flat" aria-label="Remove shadow" data-tip="Remove shadow" data-remove-shadow onClick={() => removeLayer(i)}>
+              <Glyph name="minus" />
+            </button>
+          </div>
+        ))}
+        <div class="shadow-entry">
+          <button class="add-btn shadow-add" data-add-shadow onClick={() => write([...layers, NEW_SHADOW])}>
+            <Glyph name="plus" />
+            Add shadow layer
+          </button>
+          <span class="icon-space" />
+        </div>
+      </div>
+    </Row>
+  )
+}
+
 function TextBody() {
   const ed = useEditor()
   // The weight note depends on which font files have loaded; redraw when more arrive.
@@ -913,7 +1013,7 @@ function IconBody() {
 }
 
 /** Sections that can be added to an element that doesn't use them yet. */
-const ADDABLE: Partial<Record<Category, string>> = { Fill: 'Fill', Shape: 'Radius', Border: 'Border', Spacing: 'Spacing' }
+const ADDABLE: Partial<Record<Category, string>> = { Fill: 'Fill', Shape: 'Radius', Border: 'Border', Shadow: 'Shadow', Spacing: 'Spacing' }
 
 function AddRow({ missing, onAdd, lead }: { missing: Category[]; onAdd(c: Category): void; lead?: boolean }) {
   if (!missing.length) return null
@@ -937,6 +1037,7 @@ const BODIES: Record<Category, (props: { autoOpen?: boolean; onRemove?: () => vo
   Shape: ShapeBody,
   Fill: FillBody,
   Border: BorderBody,
+  Shadow: ShadowBody,
   Text: TextBody,
   Icon: IconBody,
   Other: () => null,

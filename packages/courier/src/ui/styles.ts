@@ -12,8 +12,12 @@ export const css = /* css */ `
   --bg: #1c1c1c;
   --body: #252525;
   --chip: #333333;
-  --chip-hover: #3c3c3c;
-  --field: #303030;
+  /* White at 5% over --bg, kept solid. */
+  --chip-hover: #272727;
+  /* White at 3% over --body, kept solid. Fields fade down to it from --field-top. */
+  --field: #2c2c2c;
+  --field-top: #303030;
+  --field-fill: linear-gradient(to bottom, var(--field-top), var(--field));
   --line: rgba(255, 255, 255, 0.07);
   /* Dark mode depth. On a dark page a shadow has nothing darker to sit on and
      smears into a halo, so a light hairline draws the edge. Shadows stay tight
@@ -34,8 +38,10 @@ export const css = /* css */ `
   inset: 0;
   z-index: 2147483647;
   pointer-events: none;
-  font: 500 14px/1.3 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
-  letter-spacing: -0.01em;
+  font: 500 13px/1.3 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+  letter-spacing: -0.015em;
+  /* No lone word on the last line of notes, hints and toasts. */
+  text-wrap: pretty;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -71,7 +77,7 @@ button:disabled { cursor: default; opacity: 0.4; }
   position: absolute;
   font-family: "Courier Paper Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   font-weight: 500;
-  letter-spacing: 0;
+  letter-spacing: -0.015em;
   left: -2px;
   bottom: calc(100% + 4px);
   background: var(--hl);
@@ -98,7 +104,7 @@ button:disabled { cursor: default; opacity: 0.4; }
 /* Phones: 48px each side would leave too little panel. */
 @media (max-width: 480px) {
   .dock { right: 16px; bottom: 16px; max-width: calc(100vw - 32px); }
-  .panel { height: min(540px, calc(100vh - 92px)); }
+  .panel { height: min(540px, calc(100vh - 88px)); }
   .dock.left { left: 16px; }
 }
 
@@ -113,30 +119,50 @@ button:disabled { cursor: default; opacity: 0.4; }
 .dock.left .panel[data-enter] { transform-origin: bottom left; }
 
 /*
- * Toolbar: 40px circles in a pill with 4px padding (48px tall). The launcher
- * is the last button, so collapsed the pill is just clipped to its last 48px;
+ * Toolbar: 36px circles in a pill with 4px padding (44px tall). The launcher
+ * is the last button, so collapsed the pill is just clipped to its last 44px;
  * opening unclips leftwards to reveal the eye and copy buttons while the
- * pencil turns into the close button in place. Shadow lives on the wrapper
- * as drop-shadow, since clip-path would cut a box-shadow off. The first
- * drop-shadow, a white one with almost no blur, is the hairline: it follows
- * the clipped shape, so the edge is right collapsed, open and in between.
+ * pencil turns into the close button in place. Shadows live on the wrapper
+ * as drop-shadow, since clip-path would cut a box-shadow off, so they follow
+ * the clipped shape collapsed, open and in between.
+ *
+ * Edges: a 1px ring in the background color outside, and a 1px white 5%
+ * border inside. The clip reaches 1px past the pill to keep the ring. The
+ * inner border can't be an inset shadow, the clip would cut its left side
+ * when collapsed, so it's an overlay that widens in step with the clip.
  */
 .toolbar-wrap {
   position: relative;
   pointer-events: none;
-  filter: drop-shadow(0 0 0.5px rgba(255, 255, 255, 0.3)) var(--pill-shadow);
+  filter: var(--pill-shadow);
 }
 .toolbar {
+  position: relative;
   pointer-events: auto;
   padding: 4px;
-  border-radius: 24px;
+  border-radius: 22px;
   background: var(--bg);
-  clip-path: inset(0 0 0 calc(100% - 48px) round 24px);
+  box-shadow: 0 0 0 1px var(--bg);
+  clip-path: inset(-1px -1px -1px calc(100% - 45px) round 23px);
   transition: clip-path 200ms var(--ease-out);
+}
+.toolbar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 44px;
+  border-radius: 22px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+  transition: width 200ms var(--ease-out);
 }
 .toolbar-row { display: flex; gap: 4px; }
 /* Opening takes a little longer than closing: the system answering is fast, the reveal is shown. */
-.toolbar.open { clip-path: inset(0 round 24px); transition-duration: 260ms; }
+.toolbar.open { clip-path: inset(-1px round 23px); transition-duration: 260ms; }
+.toolbar.open::after { width: 100%; transition-duration: 260ms; }
+.toolbar.instant::after,
 .toolbar.instant, .toolbar.instant .morph { transition: none; }
 
 /* Pencil to close: a short crossfade with a quarter turn, blur bridging the two shapes. */
@@ -151,8 +177,8 @@ button:disabled { cursor: default; opacity: 0.4; }
 .launcher.is-open .x { opacity: 1; transform: none; filter: none; }
 .tool {
   position: relative;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -209,40 +235,50 @@ button:disabled { cursor: default; opacity: 0.4; }
   position: absolute;
   top: -6px;
   right: -6px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 9px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
   background: var(--blue);
   color: #fff;
   font-size: 11px;
   font-weight: 600;
-  line-height: 18px;
+  line-height: 16px;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
-.tool .badge { top: -1px; right: -1px; box-shadow: 0 0 0 2px var(--bg); }
-.launcher-badge { top: -4px; right: -4px; box-shadow: 0 0 0 2px var(--bg); }
+/* Sits on the launcher's top right corner. Open, it moves to copy's: two 36px
+   buttons, three 4px gaps and copy's 1px overhang to the left, and down to
+   copy's top edge. Same timing as the toolbar's clip, so it rides the reveal. */
+.toolbar-badge {
+  top: -4px;
+  right: -4px;
+  box-shadow: 0 0 0 2px var(--bg);
+  transition: transform 200ms var(--ease-out), opacity 150ms var(--ease-out);
+}
+.toolbar-badge.at-copy { transform: translate(-87px, 7px); transition-duration: 260ms, 150ms; }
+.toolbar-badge.gone { opacity: 0; }
+.toolbar-badge.instant { transition: none; }
 
 /* Panel */
 /* A fixed height, so switching tabs never resizes the panel; the body scrolls.
-   Never taller than the space above the toolbar (48px inset, 48px toolbar, gap). */
+   Never taller than the space above the toolbar (48px inset, 44px toolbar, gap). */
 .panel {
   width: 360px;
   max-width: 100%;
-  height: min(540px, calc(100vh - 124px));
+  height: min(540px, calc(100vh - 120px));
   display: flex;
   flex-direction: column;
   border-radius: 20px;
   background: var(--bg);
   overflow: hidden;
 }
-.panel-head { display: flex; align-items: center; gap: 4px; padding: 12px 12px 0 16px; cursor: grab; }
+.panel-head { display: flex; align-items: center; padding: 12px 12px 0 16px; cursor: grab; }
 .panel-head:active { cursor: grabbing; }
-.panel-title { flex: 1; min-width: 0; }
+.panel-title { flex: 1; min-width: 0; margin-right: 4px; }
 .panel-title h2, .panel-title p {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -318,6 +354,8 @@ button:disabled { cursor: default; opacity: 0.4; }
   transform: scale(0.97);
 }
 .icon-btn:hover:not(:disabled) { background: var(--chip-hover); color: #fff; }
+/* The body is lighter than the header, so its hover needs more: white at 6% over --body. */
+.panel-body .icon-btn:hover:not(:disabled) { background: #323232; }
 .icon-btn.flat.on { background: #3a3a3a; color: #fff; }
 
 /* Scrollbars: 4px, white at 10%, no track. Chrome 121+ ignores the
@@ -333,7 +371,9 @@ button:disabled { cursor: default; opacity: 0.4; }
   background: rgba(255, 255, 255, 0.1);
   background-clip: padding-box;
   border-right: 4px solid transparent;
-  border-radius: 6px;
+  /* Radii are for the outer box. The right ones are 4px wider to reach past the
+     border, so the visible 4px bar ends in full 2px curves on both sides. */
+  border-radius: 2px 6px 6px 2px / 2px;
 }
 
 /* Category tabs: underline style, scroll sideways with faded edges */
@@ -375,15 +415,15 @@ button:disabled { cursor: default; opacity: 0.4; }
   position: absolute;
   top: -7px;
   right: -9px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 9px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
   background: var(--blue);
   color: #fff;
   font-size: 11px;
   font-weight: 600;
-  line-height: 18px;
+  line-height: 16px;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -421,9 +461,42 @@ button:disabled { cursor: default; opacity: 0.4; }
 .pctl { grid-area: ctl; display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
 .pctl > .field, .pctl > .color-wrap { flex: 1; }
 .pctl > .field.select:not(:only-child) { flex: 0 0 84px; }
-.preset { grid-area: reset; height: var(--h); display: grid; place-items: center; }
+/* The slot never takes the pointer, only its button does: the shadow row puts
+   its first remove button under this slot. */
+.preset { grid-area: reset; height: var(--h); display: grid; place-items: center; pointer-events: none; }
+.preset .reset { pointer-events: auto; }
 .pnote { grid-area: note; margin: 0; color: var(--muted); }
 .pnote.lead { margin: 0 0 6px; }
+/* Shadow layers: one card each, as wide as any field. The row has no reset,
+   so each card's remove button takes the reset column instead.
+   Everything inside and between is 6px apart, the same as two fields side by side. */
+.shadow-stack {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Out into the reset column: the row's 8px column gap plus its width. */
+  margin-right: calc(-8px - var(--h));
+}
+.shadow-entry { display: flex; align-items: flex-start; gap: 8px; }
+.shadow-layer {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  /* Concentric: 6px controls + 6px padding. */
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+/* A tad brighter than fields elsewhere, so they stand off the card. */
+.shadow-layer .field { background: linear-gradient(to bottom, #353535, #313131); }
+/* Level with the type dropdown inside the card. */
+.shadow-entry > [data-remove-shadow] { margin-top: 6px; }
+.shadow-add { flex: 1; justify-content: center; }
+.icon-space { flex: none; width: var(--h); }
 .pgroup { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
 .grid2 { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .grid2.one { grid-template-columns: 1fr; }
@@ -464,8 +537,11 @@ button:disabled { cursor: default; opacity: 0.4; }
   height: var(--h);
   min-width: 0;
   border-radius: var(--r);
-  background: var(--field);
+  background: var(--field-fill);
+  /* A faint light edge inside, a dark ring outside. */
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.1);
 }
+.field.readonly { box-shadow: none; }
 .field:focus-within { box-shadow: inset 0 0 0 1px var(--hl); }
 .field.invalid { box-shadow: inset 0 0 0 1px var(--red); }
 .field input {
@@ -626,14 +702,17 @@ select option { color: #111; }
 
 /* Segmented */
 .seg {
+  position: relative;
   flex: 1;
   display: flex;
   height: var(--h);
   border-radius: var(--r);
-  background: var(--field);
+  /* Black at 15% over --body: a track sunk below the panel. */
+  background: #1f1f1f;
   min-width: 0;
 }
 .seg button {
+  position: relative;
   flex: 1;
   min-width: 0;
   height: var(--h);
@@ -643,9 +722,22 @@ select option { color: #111; }
   border-radius: var(--r);
   color: var(--muted);
   white-space: nowrap;
+  transition: color 200ms ease;
 }
-.seg button:hover:not(.on) { color: #fff; }
-.seg button.on { background: var(--body); color: #fff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
+.seg button:hover:not(.on), .seg button.on { color: #fff; }
+/* The active option's fill. Options are equal width, so it moves by its own width. */
+.seg-pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: var(--r);
+  /* Looks exactly like a field. */
+  background: var(--field-fill);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.1);
+  transition: transform 200ms var(--ease-in-out), opacity 150ms var(--ease-out);
+}
+.seg-pill.none { opacity: 0; }
 .seg-icon { display: grid; transition: transform 160ms var(--ease-out); }
 
 /* Footer */
@@ -669,7 +761,13 @@ select option { color: #111; }
 .btn { height: var(--h); padding: 0 12px; border-radius: var(--r); }
 .btn-ghost { background: #2e2e2e; color: #a3a3a3; }
 .btn-ghost:hover:not(:disabled) { color: #fff; }
-.btn-primary { background: #fff; color: #111; }
+.btn-primary {
+  background: #fff;
+  color: #111;
+  transition: transform 160ms var(--ease-out), background-color 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+/* Nothing to save: looks like the disabled ghost buttons beside it, not a dimmed white one. */
+.btn-primary:disabled { background: #2e2e2e; color: #a3a3a3; }
 
 .preview {
   width: 100%;
@@ -689,13 +787,15 @@ select option { color: #111; }
   position: fixed;
   min-width: 20px;
   height: 20px;
-  padding: 0 6px;
+  /* 2px more at the bottom: the text sits low optically, brackets most of all. */
+  padding: 0 6px 2px;
   border-radius: 10px;
   background: var(--blue);
   color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
   transform: translate(-50%, -50%);
   pointer-events: auto;
@@ -719,7 +819,13 @@ select option { color: #111; }
   color: #fff;
   white-space: nowrap;
   pointer-events: none;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16), 0 2px 8px rgba(0, 0, 0, 0.3);
+  /* A light edge inside (stronger than fields', black swallows a faint one),
+     a ring in the background color outside, and small shadows under it. */
+  box-shadow:
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.15),
+    0 0 0 0.5px #000,
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 4px 12px rgba(0, 0, 0, 0.15);
 }
 .popover {
   position: fixed;
@@ -738,6 +844,7 @@ select option { color: #111; }
    scaling and reveals go. */
 @media (prefers-reduced-motion: reduce) {
   * { transition-property: opacity !important; }
+  .toolbar::after { transition: none !important; }
   .tool:active, .icon-btn:active, .btn:active, .add-btn:active { transform: none !important; }
 }
 `

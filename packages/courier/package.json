@@ -50,6 +50,7 @@
     "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
+    "@hugeicons/core-free-icons": "^4.4.0",
     "happy-dom": "^20.14.6",
     "preact": "^10.27.0",
     "tsup": "^8.5.1",

@@ -6,7 +6,9 @@ import {
   categorize,
   collapseGroup,
   findMatches,
+  formatShadows,
   parseLength,
+  parseShadows,
   roundLengths,
   selectorPath,
   shortName,
@@ -60,6 +62,29 @@ describe('values', () => {
     expect(parseLength('1.5')).toEqual({ num: 1.5, unit: '' })
     expect(parseLength('-0.5em')).toEqual({ num: -0.5, unit: 'em' })
     expect(parseLength('auto')).toBeNull()
+  })
+})
+
+describe('shadows', () => {
+  it('reads every layer of a computed box-shadow', () => {
+    expect(parseShadows('rgba(0, 0, 0, 0.3) 0px 2px 8px 0px, rgb(255, 255, 255) 0px 0px 0px 1px inset')).toEqual([
+      { inset: false, x: 0, y: 2, blur: 8, spread: 0, color: '#0000004D' },
+      { inset: true, x: 0, y: 0, blur: 0, spread: 1, color: '#FFFFFF' },
+    ])
+  })
+  it('reads authored order with missing blur and spread', () => {
+    expect(parseShadows('inset 0 -1px #000')).toEqual([{ inset: true, x: 0, y: -1, blur: 0, spread: 0, color: '#000000' }])
+  })
+  it('treats none as no layers', () => {
+    expect(parseShadows('none')).toEqual([])
+    expect(formatShadows([])).toBe('none')
+  })
+  it('writes layers back with every length', () => {
+    const css = 'rgba(0, 0, 0, 0.25) 0px 4px 4px 0px, rgba(255, 255, 255, 0.05) 0px 0px 0px 0.5px inset'
+    expect(formatShadows(parseShadows(css))).toBe('0px 4px 4px 0px #00000040, inset 0px 0px 0px 0.5px #FFFFFF0D')
+  })
+  it('is in the Shadow category', () => {
+    expect(categorize('box-shadow')).toBe('Shadow')
   })
 })
 

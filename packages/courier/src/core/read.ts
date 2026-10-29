@@ -20,6 +20,8 @@ export function normalize(property: string, raw: string): string {
   if (isColorProperty(property)) return toHex(raw) ?? raw
   // Courier only shows gaps on flex and grid boxes, where "normal" is 0.
   if (GAPS.has(property) && raw === 'normal') return '0px'
+  // One layer format for computed and edited shadows, so before and after compare.
+  if (property === 'box-shadow') return formatShadows(parseShadows(raw))
   return roundLengths(raw)
 }
 
@@ -98,6 +100,69 @@ export function parseLength(value: string): ParsedLength | null {
 }
 
 export const px = (value: string) => parseFloat(value) || 0
+
+// Shadows
+
+/** One box-shadow layer, like one drop or inner shadow in Figma's effects. */
+export interface ShadowLayer {
+  inset: boolean
+  x: number
+  y: number
+  blur: number
+  spread: number
+  /** #RRGGBB or #RRGGBBAA */
+  color: string
+}
+
+/** Split on separators outside parentheses, so rgba(0, 0, 0, 0.3) stays whole. */
+function splitTop(value: string, sep: RegExp): string[] {
+  const out: string[] = []
+  let depth = 0
+  let part = ''
+  for (const ch of value) {
+    if (ch === '(') depth++
+    else if (ch === ')') depth--
+    if (depth === 0 && sep.test(ch)) {
+      if (part.trim()) out.push(part.trim())
+      part = ''
+    } else part += ch
+  }
+  if (part.trim()) out.push(part.trim())
+  return out
+}
+
+/**
+ * Layers of a box-shadow value, in either order browsers and authors write
+ * them: "rgba(0, 0, 0, 0.3) 0px 2px 8px 0px inset" or "inset 0 2px 8px #000".
+ * Missing blur and spread are 0, a missing color is the text color's black.
+ */
+export function parseShadows(value: string): ShadowLayer[] {
+  const v = value.trim()
+  if (!v || v === 'none') return []
+  return splitTop(v, /,/).map((layer) => {
+    let inset = false
+    const lengths: number[] = []
+    const color: string[] = []
+    for (const token of splitTop(layer, /\s/)) {
+      const n = parseLength(token)
+      if (token === 'inset') inset = true
+      else if (n && (n.unit === 'px' || n.num === 0)) lengths.push(n.num)
+      else color.push(token)
+    }
+    const [x = 0, y = 0, blur = 0, spread = 0] = lengths
+    return { inset, x, y, blur, spread, color: toHex(color.join(' ') || '#000') ?? '#000000' }
+  })
+}
+
+const r2 = (n: number) => Math.round(n * 100) / 100
+
+/** Back to CSS, every length written out: "0px 4px 4px 0px #00000040". */
+export function formatShadows(layers: ShadowLayer[]): string {
+  if (!layers.length) return 'none'
+  return layers
+    .map((l) => `${l.inset ? 'inset ' : ''}${r2(l.x)}px ${r2(l.y)}px ${r2(l.blur)}px ${r2(l.spread)}px ${l.color}`)
+    .join(', ')
+}
 
 // Baselines: the computed values an element had before Courier touched it.
 // Captured once, before the first override, and dropped when the element is

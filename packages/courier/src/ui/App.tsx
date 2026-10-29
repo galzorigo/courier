@@ -342,6 +342,11 @@ export function App({ store, host, resolveSource, report }: AppProps) {
 
   const total = store.size
   const saved = store.savedCount
+  // One badge for the toolbar: the total on the launcher while collapsed, the
+  // saved count on copy once open. While it fades out it keeps its last number.
+  const badgeCount = open ? saved : total
+  const lastBadge = useRef(badgeCount)
+  if (badgeCount > 0) lastBadge.current = badgeCount
 
   /**
    * Drag the panel from any non interactive spot. At least 20% of it stays
@@ -497,7 +502,7 @@ export function App({ store, host, resolveSource, report }: AppProps) {
                 data-tip={!total ? 'No changes yet' : badgesHidden ? 'Show badges' : 'Hide badges'}
                 onClick={() => total && setBadgesHidden(!badgesHidden)}
               >
-                {badgesHidden ? <EyeOff size={18} /> : <Eye size={18} />}
+                {badgesHidden ? <EyeOff /> : <Eye />}
               </button>
               <button
                 class="tool"
@@ -511,17 +516,12 @@ export function App({ store, host, resolveSource, report }: AppProps) {
                 {/* Both stay mounted so copied and back crossfade. */}
                 <span class={`tool-icon swap-box${copied ? ' copied' : ''}`} ref={copyIcon}>
                   <span class={`swap${copied ? ' off' : ''}`}>
-                    <Copy size={18} />
+                    <Copy />
                   </span>
                   <span class={`swap${copied ? '' : ' off'}`}>
-                    <Check size={18} />
+                    <Check />
                   </span>
                 </span>
-                {saved > 0 && (
-                  <span class="badge" data-saved>
-                    {saved}
-                  </span>
-                )}
               </button>
               <button
                 class="tool"
@@ -533,7 +533,7 @@ export function App({ store, host, resolveSource, report }: AppProps) {
                 data-tip={total ? 'Delete all changes' : 'No changes yet'}
                 onClick={deleteAll}
               >
-                <Trash size={18} />
+                <Trash />
               </button>
               {/* The launcher: a pencil while collapsed, the close button once open. Inspecting is on whenever Courier is open. */}
               <button
@@ -553,20 +553,24 @@ export function App({ store, host, resolveSource, report }: AppProps) {
                 }}
               >
                 <span class="morph pencil">
-                  <PencilFill size={18} />
+                  <PencilFill />
                 </span>
                 <span class="morph x">
-                  <Close size={18} />
+                  <Close />
                 </span>
               </button>
             </div>
           </div>
-          {/* Outside the clipped pill: collapsed, the pill is clipped to a circle that would cut a corner badge off. */}
-          {!open && total > 0 && (
-            <span class="badge launcher-badge" data-launcher-badge>
-              {total}
-            </span>
-          )}
+          {/* Outside the clipped pill, which would cut a corner badge off. It rides
+              the reveal from the launcher's corner to copy's and back. */}
+          <span
+            class={`badge toolbar-badge${open ? ' at-copy' : ''}${badgeCount ? '' : ' gone'}${instant ? ' instant' : ''}`}
+            data-launcher-badge={!open && total > 0 ? '' : undefined}
+            data-saved={open && saved > 0 ? '' : undefined}
+            aria-hidden={!badgeCount}
+          >
+            {lastBadge.current || null}
+          </span>
         </div>
       </div>
       <Tooltip root={host.shadowRoot!} quiet={!!toast} />
@@ -580,27 +584,35 @@ export function App({ store, host, resolveSource, report }: AppProps) {
  */
 function Markers({ store, selected, onPick }: { store: ChangeStore; selected: Element | null; onPick(el: Element): void }) {
   useFrame()
-  const counts = new Map<Element, number>()
+  const counts = new Map<Element, { all: number; unsaved: number }>()
   for (const c of store.list()) {
-    for (const el of c.owner === 'parent' ? [c.anchor] : c.members) counts.set(el, (counts.get(el) ?? 0) + 1)
+    const unsaved = store.isSaved(c.key) ? 0 : 1
+    for (const el of c.owner === 'parent' ? [c.anchor] : c.members) {
+      const n = counts.get(el) ?? { all: 0, unsaved: 0 }
+      counts.set(el, { all: n.all + 1, unsaved: n.unsaved + unsaved })
+    }
   }
   return (
     <>
-      {[...counts].map(([el, n], i) => {
+      {[...counts].map(([el, { all: n, unsaved }], i) => {
         if (el === selected || !el.isConnected) return null
         const r = el.getBoundingClientRect()
         if (r.bottom < 0 || r.top > innerHeight || (!r.width && !r.height)) return null
+        const changes = `${n} ${n === 1 ? 'change' : 'changes'}`
+        // Edits left without Save say so, since Cancel would still drop them.
+        const tip = !unsaved ? changes : unsaved === n ? `${changes} not saved` : `${changes}, ${unsaved} not saved`
         return (
           <button
             key={i}
-            class="marker"
+            class={`marker${unsaved ? ' unsaved' : ''}`}
             data-marker
+            data-unsaved={unsaved || undefined}
             style={{ left: r.right, top: r.top }}
-            aria-label={`${n} ${n === 1 ? 'change' : 'changes'}, edit`}
-            data-tip={`${n} ${n === 1 ? 'change' : 'changes'}`}
+            aria-label={`${tip}, edit`}
+            data-tip={tip}
             onClick={() => onPick(el)}
           >
-            {n}
+            {unsaved ? `Unsaved (${unsaved})` : n}
           </button>
         )
       })}

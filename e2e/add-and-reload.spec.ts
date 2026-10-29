@@ -12,7 +12,7 @@ async function open(page: Page) {
 }
 
 test.describe('adding what an element does not use yet', () => {
-  test('a plain heading can get a fill, radius and border', async ({ page }) => {
+  test('a plain heading can get a fill, radius, border and shadow', async ({ page }) => {
     await open(page)
     await page.locator('.section h2').first().click({ force: true })
     await o(page, '.tab[data-category="Appearance"]').click()
@@ -20,6 +20,7 @@ test.describe('adding what an element does not use yet', () => {
     await expect(add('Fill')).toBeVisible()
     await expect(add('Shape')).toHaveText('Radius')
     await expect(add('Border')).toBeVisible()
+    await expect(add('Shadow')).toBeVisible()
 
     // + Fill reveals the fill and opens the picker, ready for one click.
     await add('Fill').click()
@@ -39,6 +40,10 @@ test.describe('adding what an element does not use yet', () => {
     await add('Shape').click()
     await field(page, 'border-radius').locator('input').fill('8')
     await expect.poll(() => css(page, '.section h2', 'border-top-left-radius')).toBe('8px')
+
+    // + Shadow adds Figma's default drop shadow.
+    await add('Shadow').click()
+    await expect.poll(() => css(page, '.section h2', 'box-shadow')).toBe('rgba(0, 0, 0, 0.25) 0px 4px 4px 0px')
     await expect(o(page, '[data-add-row]')).toHaveCount(0)
 
     await o(page, '[aria-label="Copy all saved changes"]').click()
@@ -46,6 +51,7 @@ test.describe('adding what an element does not use yet', () => {
     expect(text).toContain('border-style: none → solid')
     expect(text).toContain('border-width: 0px → 1px')
     expect(text).toContain('border-radius: 0px → 8px')
+    expect(text).toContain('box-shadow: none → 0px 4px 4px 0px #00000040')
   })
 
   test('spacing can be added to an element with none', async ({ page }) => {

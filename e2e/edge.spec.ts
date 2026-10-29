@@ -385,6 +385,8 @@ test('the collapsed pencil badge sits whole on the pill corner, not clipped', as
   await expect(badge).toHaveText('1')
   // Not inside the clipped pill.
   expect(await badge.evaluate((el) => !!el.closest('.toolbar'))).toBe(false)
+  // It travels back from the copy button; measure once it lands.
+  await expect.poll(() => badge.evaluate((el) => getComputedStyle(el).transform)).toBe('none')
   const b = (await badge.boundingBox())!
   const pill = (await o(page, '[data-courier-launcher]').boundingBox())!
   // On the top right corner of the visible circle.

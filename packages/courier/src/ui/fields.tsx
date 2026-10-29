@@ -198,6 +198,7 @@ export function Row({
   stacked,
   children,
   note,
+  resettable = true,
 }: {
   label: ComponentChildren
   props: string[]
@@ -209,6 +210,8 @@ export function Row({
   stacked?: boolean
   children: ComponentChildren
   note?: ComponentChildren
+  /** False hides the reset button; the row still marks itself changed. */
+  resettable?: boolean
 }) {
   const ed = useEditor()
   const groups = [{ props, owner }, { props: parentProps, owner: 'parent' as Owner }, ...more].map((g) => ({
@@ -224,7 +227,7 @@ export function Row({
       <span class="plabel">{label}</span>
       <div class="pctl">{children}</div>
       <span class="preset">
-        {count > 0 && (
+        {count > 0 && resettable && (
           <button class="reset" data-tip={count === 1 ? `Reset to ${only!.before}` : 'Reset'} aria-label="Reset" onClick={reset}>
             <Reset />
           </button>
@@ -363,6 +366,8 @@ export interface NumberFieldProps {
   presets?: Option[]
   /** Replaces the unit shown at the end of the field. */
   suffix?: string
+  /** Property to check typed values against, when the field edits part of one (a shadow's blur). */
+  validateAs?: string
 }
 
 export function NumberField({
@@ -381,6 +386,7 @@ export function NumberField({
   onValue,
   presets = [],
   suffix,
+  validateAs = property,
 }: NumberFieldProps) {
   const ed = useEditor()
   const value = valueOverride ?? ed.value(property, owner)
@@ -412,7 +418,7 @@ export function NumberField({
     const isNum = /^-?\d*\.?\d+$/.test(t)
     const v = isNum ? toValue(Number(t)) : t
     const n = isNum ? Number(t) : parseLength(v)?.num
-    const ok = isValid(property, v) && (n === undefined || inRange(n))
+    const ok = isValid(validateAs, v) && (n === undefined || inRange(n))
     d.setInvalid(!ok)
     if (!ok) return
     if (isNum) last.current = Number(t)
@@ -596,8 +602,15 @@ export function SegField({
   const ed = useEditor()
   const value = valueOverride ?? ed.value(property, owner)
   const current = aliased(property, value)
+  const index = options.findIndex((o) => o.value === current)
   return (
     <div class="seg" role="radiogroup" aria-label={property} data-property={property}>
+      {/* One pill slides under the options, so switching reads as a move, not a swap. */}
+      <span
+        class={`seg-pill${index < 0 ? ' none' : ''}`}
+        style={{ width: `${100 / options.length}%`, transform: `translateX(${Math.max(index, 0) * 100}%)` }}
+        aria-hidden="true"
+      />
       {options.map((o) => {
         const Icon = o.icon ? ICONS[o.icon] : null
         return (
@@ -758,9 +771,22 @@ function Picker({ hex, onPick }: { hex: string; onPick: (hex: string) => void })
   )
 }
 
-export function ColorField({ property, owner = 'self', autoOpen }: { property: string; owner?: Owner; autoOpen?: boolean }) {
+export function ColorField({
+  property,
+  owner = 'self',
+  autoOpen,
+  value: valueOverride,
+  onValue,
+}: {
+  property: string
+  owner?: Owner
+  autoOpen?: boolean
+  /** Override the value shown and where edits go (a shadow layer's color). */
+  value?: string
+  onValue?: OnChange
+}) {
   const ed = useEditor()
-  const value = ed.value(property, owner)
+  const value = valueOverride ?? ed.value(property, owner)
   const hex = toHex(value) ?? value
   const base = hex.slice(0, 7)
   const alpha = /^#[0-9A-F]{8}$/i.test(hex) ? Math.round((parseInt(hex.slice(7), 16) / 255) * 100) : 100
@@ -770,7 +796,7 @@ export function ColorField({ property, owner = 'self', autoOpen }: { property: s
   useEffect(() => {
     if (autoOpen) setOpen(true)
   }, [])
-  const onChange: OnChange = (v, c) => ed.set(property, owner, v, c)
+  const onChange: OnChange = onValue ?? ((v, c) => ed.set(property, owner, v, c))
   const d = useDraft(base, value, onChange)
   const a = useDraft(String(alpha), value, onChange)
   const withAlpha = (hex6: string, pct: number) =>
@@ -781,7 +807,8 @@ export function ColorField({ property, owner = 'self', autoOpen }: { property: s
     if (!v) return d.setInvalid(false)
     if (/^[0-9a-f]{3,8}$/i.test(v)) v = '#' + v
     // Hex, or any CSS color name ("red", "transparent"), stored as hex.
-    const ok = isValid(property, v) && toHex(v) !== null
+    // Checked as a color, since the field may edit part of another property.
+    const ok = isValid('color', v) && toHex(v) !== null
     d.setInvalid(!ok)
     if (!ok) return
     const h = toHex(v) ?? v

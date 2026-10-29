@@ -91,6 +91,7 @@ export function usedCategories(el: Element): Category[] {
   const bg = toHex(cs.backgroundColor)
   if ((bg && !bg.endsWith('00')) || parseFloat(cs.opacity) < 1) used.add('Fill')
   if (hasBorder(el)) used.add('Border')
+  if (cs.boxShadow && cs.boxShadow !== 'none') used.add('Shadow')
   if (hasOwnText(el)) used.add('Text')
   if (findIcon(el)) used.add('Icon')
   return CATEGORIES.filter((c) => used.has(c))
@@ -138,6 +139,8 @@ export function sectionsFor(category: Category, el: Element): Section[] {
       return [{ properties: ['background-color', 'opacity'] }]
     case 'Border':
       return [{ properties: [...group('border-width'), ...group('border-style'), ...group('border-color')] }]
+    case 'Shadow':
+      return [{ properties: ['box-shadow'] }]
     case 'Text': {
       const props = ['color', 'font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing']
       // Alignment only matters when the box is wider than its text.
